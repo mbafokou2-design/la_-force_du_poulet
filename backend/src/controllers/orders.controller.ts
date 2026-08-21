@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { pool } from "../config/db";
 import { logger } from "../utils/logger";
-import { sendOrderSms } from "../services/tranzak.service";
+import { sendOrderSms as sendOrderSmsDefault, SmsResult } from "../services/orange-sms.service";
 
 const CONTEXT = "orders.controller.ts";
 
@@ -12,13 +12,36 @@ interface CartItem {
   qty: number;
 }
 
+type QueryablePool = {
+  connect: () => Promise<{
+    query: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }>;
+    release: () => void;
+  }>;
+  query: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }>;
+};
+
+export type CreateOrderDependencies = {
+  pool: QueryablePool;
+  sendOrderSms: (tableNumber: string, message: string) => Promise<SmsResult>;
+};
+
 /**
  * POST /api/orders
  * Reçoit le panier validé depuis le frontend client, l'enregistre en base,
- * puis tente d'envoyer le SMS récap au staff via Tranzak.
+ * puis tente d'envoyer le SMS récap au staff via Orange SMS.
  * body: { table_number: string, items: CartItem[] }
  */
 export async function createOrder(req: Request, res: Response) {
+  return createOrderWithDeps(req, res);
+}
+
+export async function createOrderWithDeps(
+  req: Request,
+  res: Response,
+  deps?: Partial<CreateOrderDependencies>
+) {
+  const db = deps?.pool ?? pool;
+  const sendOrderSms = deps?.sendOrderSms ?? sendOrderSmsDefault;
   const { table_number, items } = req.body as { table_number: string; items: CartItem[] };
 
   // --- Validation d'entrée ---
@@ -32,7 +55,7 @@ export async function createOrder(req: Request, res: Response) {
     return res.status(400).json({ error: "Le panier est vide." });
   }
 
-  const client = await pool.connect();
+  const client = await db.connect();
 
   try {
     await client.query("BEGIN");
@@ -58,16 +81,29 @@ export async function createOrder(req: Request, res: Response) {
     }
 
     await client.query("COMMIT");
-    logger.info(CONTEXT, `Commande #${order.id} enregistrée pour la table ${table_number} — ${totalAmount} FCFA`);
+    logger.info(CONTEXT, `commande créée #${order.id} pour la table ${table_number} — ${totalAmount} FCFA`);
 
-    // --- Envoi SMS (ne doit jamais faire échouer la commande si ça plante) ---
-    const smsMessage = buildSmsMessage(table_number, items, totalAmount);
-    const smsResult = await sendOrderSms(table_number, smsMessage);
+    // --- Envoi SMS : ne doit jamais faire échouer la commande ---
+    let smsResult: SmsResult = { success: false, errorMessage: "SMS non tenté." };
+    try {
+      const smsMessage = buildSmsMessage(table_number, items, totalAmount);
+      smsResult = await sendOrderSms(table_number, smsMessage);
+    } catch (smsErr: any) {
+      smsResult = {
+        success: false,
+        errorMessage: smsErr?.message || "Erreur inattendue lors de l'envoi SMS.",
+      };
+      logger.error(CONTEXT, `SMS a levé une exception après commande #${order.id}`, smsErr);
+    }
 
-    await pool.query(
-      `UPDATE orders SET sms_status = $1, sms_error = $2 WHERE id = $3`,
-      [smsResult.success ? "sent" : "failed", smsResult.errorMessage || null, order.id]
-    );
+    try {
+      await db.query(
+        `UPDATE orders SET sms_status = $1, sms_error = $2 WHERE id = $3`,
+        [smsResult.success ? "sent" : "failed", smsResult.errorMessage || null, order.id]
+      );
+    } catch (updateErr: any) {
+      logger.error(CONTEXT, `Commande #${order.id} créée mais mise à jour sms_status impossible`, updateErr);
+    }
 
     if (!smsResult.success) {
       logger.warn(CONTEXT, `Commande #${order.id} enregistrée mais SMS non envoyé: ${smsResult.errorMessage}`);

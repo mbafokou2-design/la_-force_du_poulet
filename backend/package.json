@@ -7,7 +7,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tsx --test src/__tests__/orange-sms.service.test.ts src/__tests__/orders.controller.test.ts",
+    "sms:send-test": "tsx src/scripts/send-test-sms.ts"
   },
   "keywords": [],
   "author": "",

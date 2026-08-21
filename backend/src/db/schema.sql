@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS orders (
   table_number VARCHAR(20) NOT NULL, -- copié au moment de la commande (garde l'historique même si la table est supprimée)
   total_amount INTEGER NOT NULL,     -- en FCFA
   sms_status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending | sent | failed
-  sms_error TEXT,                    -- message d'erreur Tranzak si échec
+  sms_error TEXT,                    -- message d'erreur SMS (Orange) si échec
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
