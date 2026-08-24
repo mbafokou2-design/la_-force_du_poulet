@@ -7,7 +7,12 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { OrangeSmsService, maskPhoneNumber, validateOrangeSmsConfig } from "../services/orange-sms.service";
+import {
+  OrangeSmsService,
+  maskPhoneNumber,
+  toOrangeAddress,
+  validateOrangeSmsConfig,
+} from "../services/orange-sms.service";
 
 function pickRecipient(): string | null {
   const argPhone = process.argv[2]?.trim();
@@ -26,7 +31,7 @@ function buildService(): OrangeSmsService {
     authorization: process.env.ORANGE_AUTHORIZATION || "",
     clientId: process.env.ORANGE_CLIENT_ID || "",
     clientSecret: process.env.ORANGE_CLIENT_SECRET || "",
-    senderAddress: process.env.ORANGE_SENDER_ADDRESS || "",
+    senderAddress: process.env.ORANGE_SMS_SENDER || "",
   };
 
   validateOrangeSmsConfig(config);
@@ -40,7 +45,8 @@ async function main() {
     process.exit(1);
   }
 
-  const senderAddress = process.env.ORANGE_SENDER_ADDRESS || "";
+  const senderAddress = process.env.ORANGE_SMS_SENDER || "";
+  const recipientAddress = toOrangeAddress(recipient);
   let service: OrangeSmsService;
 
   try {
@@ -50,25 +56,35 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`SMS test recipient: ${maskPhoneNumber(recipient)}`);
-  console.log(`SMS test sender: ${senderAddress}`);
-  console.log("SMS test message: La Force du Poulet - Orange test SMS.");
+  console.log("SMS test started");
+  console.log(`  senderAddress: ${senderAddress}`);
+  console.log(`  recipientInput: ${recipient}`);
+  console.log(`  recipientAddress: ${recipientAddress}`);
+  console.log(`  recipientMasked: ${maskPhoneNumber(recipient)}`);
+  console.log("  message: La Force du Poulet - Orange test SMS.");
 
   const result = await service.sendSms(recipient, "La Force du Poulet - Orange test SMS.");
 
   if (!result.success) {
-    console.error("FAILED");
-    console.error(`  kind: ${result.errorKind || "unknown"}`);
-    console.error(`  http: ${result.httpStatus ?? "n/a"}`);
-    console.error(`  message: ${result.errorMessage || "unknown error"}`);
-    console.error(`  attempts: ${result.attemptCount ?? 0}`);
+    console.error("SMS test result: FAILED");
+    console.error(`  errorKind: ${result.errorKind || "unknown"}`);
+    console.error(`  httpStatus: ${result.httpStatus ?? "n/a"}`);
+    console.error(`  errorMessage: ${result.errorMessage || "unknown error"}`);
+    console.error(`  attemptCount: ${result.attemptCount ?? 0}`);
+    console.error(`  requestStartedAt: ${result.requestStartedAt || "n/a"}`);
+    console.error(`  requestCompletedAt: ${result.requestCompletedAt || "n/a"}`);
+    console.error(`  requestDurationMs: ${result.requestDurationMs ?? "n/a"}`);
     process.exit(1);
   }
 
-  console.log("OK");
-  console.log(`  http: ${result.httpStatus ?? "n/a"}`);
+  console.log("SMS test result: OK");
+  console.log(`  httpStatus: ${result.httpStatus ?? "n/a"}`);
   console.log(`  messageId: ${result.messageId || "n/a"}`);
-  console.log(`  attempts: ${result.attemptCount ?? 0}`);
+  console.log(`  orangeResourceId: ${result.orangeResourceId || "n/a"}`);
+  console.log(`  orangeRequestId: ${result.orangeRequestId || "n/a"}`);
+  console.log(`  attemptCount: ${result.attemptCount ?? 0}`);
+  console.log(`  requestStartedAt: ${result.requestStartedAt || "n/a"}`);
+  console.log(`  requestCompletedAt: ${result.requestCompletedAt || "n/a"}`);
   console.log(`  requestDurationMs: ${result.requestDurationMs ?? "n/a"}`);
 }
 

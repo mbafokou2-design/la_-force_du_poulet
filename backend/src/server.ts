@@ -26,10 +26,16 @@ async function start() {
       authorization: process.env.ORANGE_AUTHORIZATION || "",
       clientId: process.env.ORANGE_CLIENT_ID || "",
       clientSecret: process.env.ORANGE_CLIENT_SECRET || "",
-      senderAddress: process.env.ORANGE_SENDER_ADDRESS || "",
+      senderAddress: process.env.ORANGE_SMS_SENDER || "",
     });
-    await testConnection(); // plante ici avec un message clair si Neon est injoignable
-    await ensureSmsSchema();
+
+    try {
+      await testConnection();
+      await ensureSmsSchema();
+    } catch (dbErr) {
+      logger.warn("server.ts", "⚠️ Base Neon indisponible au démarrage; le serveur continue sans initialisation DB.");
+      logger.warn("server.ts", "Les routes dépendantes de la DB échoueront tant que Neon reste injoignable.", dbErr);
+    }
 
     app.listen(PORT, () => {
       logger.info("server.ts", `✅ Serveur démarré sur http://localhost:${PORT}`);

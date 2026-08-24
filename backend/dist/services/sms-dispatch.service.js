@@ -4,6 +4,7 @@ exports.dispatchOrderSms = dispatchOrderSms;
 const logger_1 = require("../utils/logger");
 const orange_sms_service_1 = require("./orange-sms.service");
 const sms_notifications_repository_1 = require("../repositories/sms-notifications.repository");
+const sms_1 = require("../utils/sms");
 const CONTEXT = "SMS";
 function staffPhoneNumbers() {
     return (process.env.STAFF_PHONE_NUMBERS || "")
@@ -23,7 +24,7 @@ async function dispatchOrderSms(input, service = new orange_sms_service_1.Orange
     authorization: process.env.ORANGE_AUTHORIZATION || "",
     clientId: process.env.ORANGE_CLIENT_ID || "",
     clientSecret: process.env.ORANGE_CLIENT_SECRET || "",
-    senderAddress: process.env.ORANGE_SENDER_ADDRESS || "",
+    senderAddress: process.env.ORANGE_SMS_SENDER || "",
 })) {
     logger_1.logger.info(CONTEXT, `notification requested (order #${input.orderId}, table ${input.tableNumber})`);
     const recipients = staffPhoneNumbers();
@@ -38,6 +39,12 @@ async function dispatchOrderSms(input, service = new orange_sms_service_1.Orange
     const perRecipient = [];
     for (const phone of recipients) {
         const requestedAt = new Date();
+        logger_1.logger.info(CONTEXT, "SMS recipient prepare", {
+            orderId: input.orderId,
+            tableNumber: input.tableNumber,
+            recipientMasked: (0, sms_1.maskPhoneNumber)(phone),
+            requestedAt: requestedAt.toISOString(),
+        });
         const notification = await (0, sms_notifications_repository_1.createSmsNotification)({
             orderId: input.orderId,
             recipientPhone: phone,
@@ -47,6 +54,21 @@ async function dispatchOrderSms(input, service = new orange_sms_service_1.Orange
             retryCount: 0,
         });
         const result = await service.sendSms(phone, input.message);
+        logger_1.logger.info(CONTEXT, "SMS recipient result", {
+            orderId: input.orderId,
+            notificationId: notification.id,
+            recipientMasked: (0, sms_1.maskPhoneNumber)(phone),
+            success: result.success,
+            errorKind: result.errorKind || null,
+            errorMessage: result.errorMessage || null,
+            attemptCount: result.attemptCount ?? 0,
+            httpStatus: result.httpStatus ?? null,
+            orangeResourceId: result.orangeResourceId ?? null,
+            orangeRequestId: result.orangeRequestId ?? null,
+            acceptedAt: result.acceptedAt || null,
+            requestCompletedAt: result.requestCompletedAt || null,
+            requestDurationMs: result.requestDurationMs ?? null,
+        });
         perRecipient.push({ phone, notificationId: notification.id, result });
         const retryCount = Math.max(0, (result.attemptCount ?? 1) - 1);
         const status = toStatus(result);
@@ -54,6 +76,12 @@ async function dispatchOrderSms(input, service = new orange_sms_service_1.Orange
         const orangeRequestId = result.orangeRequestId ?? null;
         if (orangeResourceId) {
             await (0, sms_notifications_repository_1.attachOrangeResourceId)(notification.id, orangeResourceId, orangeRequestId);
+            logger_1.logger.info(CONTEXT, "SMS orange resource attached", {
+                orderId: input.orderId,
+                notificationId: notification.id,
+                orangeResourceId,
+                orangeRequestId,
+            });
         }
         await (0, sms_notifications_repository_1.updateSmsNotificationById)(notification.id, {
             status,
@@ -71,6 +99,12 @@ async function dispatchOrderSms(input, service = new orange_sms_service_1.Orange
             requestDurationMs: result.requestDurationMs ?? null,
             deliveryLatencyMs: null,
             totalLatencyMs: null,
+        });
+        logger_1.logger.info(CONTEXT, "SMS notification row updated", {
+            orderId: input.orderId,
+            notificationId: notification.id,
+            status,
+            retryCount,
         });
     }
     const failed = perRecipient.filter((row) => !row.result.success);

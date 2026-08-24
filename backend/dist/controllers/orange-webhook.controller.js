@@ -10,20 +10,35 @@ async function processOrangeSmsDeliveryReceipt(body, deps = {}) {
     const receivedAt = deps.now ? deps.now() : new Date();
     const parsed = (0, sms_1.extractOrangeDeliveryCallbackData)(body);
     if (!parsed || !parsed.callbackData || !parsed.deliveryStatus) {
-        logger_1.logger.warn(CONTEXT, "callback invalid");
+        logger_1.logger.warn(CONTEXT, "callback invalid", {
+            receivedAt: receivedAt.toISOString(),
+            hasCallbackData: Boolean(parsed?.callbackData),
+            hasDeliveryStatus: Boolean(parsed?.deliveryStatus),
+        });
         return { ok: true, processed: false, reason: "invalid" };
     }
     const orangeResourceId = parsed.callbackData.trim();
     const deliveryStatus = parsed.deliveryStatus.trim();
     const internalStatus = (0, sms_1.mapOrangeDeliveryStatus)(deliveryStatus);
     const phoneMasked = parsed.recipientPhone ? (0, sms_1.maskPhoneNumber)(parsed.recipientPhone) : "unknown";
-    logger_1.logger.info(CONTEXT, `delivery callback received for ${orangeResourceId} (${phoneMasked})`);
-    logger_1.logger.info(CONTEXT, deliveryStatus);
+    logger_1.logger.info(CONTEXT, "delivery callback received", {
+        receivedAt: receivedAt.toISOString(),
+        orangeResourceId,
+        deliveryStatus,
+        internalStatus,
+        recipientMasked: phoneMasked,
+        rawAddress: parsed.rawAddress || null,
+    });
     const findByOrangeResourceId = deps.findByOrangeResourceId ?? sms_notifications_repository_1.findSmsNotificationByOrangeResourceId;
     const updateByOrangeResourceId = deps.updateByOrangeResourceId ?? sms_notifications_repository_1.updateSmsNotificationByOrangeResourceId;
     const existing = await findByOrangeResourceId(orangeResourceId);
     if (!existing) {
-        logger_1.logger.warn(CONTEXT, `callback unknown resource ID ${orangeResourceId}`);
+        logger_1.logger.warn(CONTEXT, `callback unknown resource ID ${orangeResourceId}`, {
+            orangeResourceId,
+            deliveryStatus,
+            internalStatus,
+            recipientMasked: phoneMasked,
+        });
         return { ok: true, processed: false, reason: "unknown_resource_id" };
     }
     const acceptedAt = existing.accepted_at ? new Date(existing.accepted_at) : null;
@@ -43,8 +58,29 @@ async function processOrangeSmsDeliveryReceipt(body, deps = {}) {
         errorMessage: internalStatus === "FAILED" ? existing.error_message : existing.error_message,
         errorCode: existing.error_code,
     });
-    if (deliveryLatencyMs !== null && deliveryLatencyMs !== undefined) {
-        logger_1.logger.info(CONTEXT, `delivery latency = ${deliveryLatencyMs} ms`);
+    logger_1.logger.info(CONTEXT, "delivery receipt stored", {
+        orangeResourceId,
+        notificationId: existing.id,
+        orderId: existing.order_id,
+        status: internalStatus,
+        orangeDeliveryStatus: deliveryStatus,
+        recipientMasked: phoneMasked,
+        requestedAt: requestedAt?.toISOString?.() ?? null,
+        acceptedAt: acceptedAt?.toISOString?.() ?? null,
+        deliveredAt: deliveredAt?.toISOString?.() ?? null,
+        failedAt: failedAt?.toISOString?.() ?? null,
+        callbackReceivedAt: receivedAt.toISOString(),
+        deliveryLatencyMs,
+        totalLatencyMs,
+    });
+    if (internalStatus === "DELIVERED") {
+        logger_1.logger.info(CONTEXT, "SMS livre jusqu'au terminal du destinataire");
+    }
+    else if (internalStatus === "DELIVERED_TO_NETWORK") {
+        logger_1.logger.info(CONTEXT, "SMS livre au reseau operateur, pas encore confirme sur le terminal");
+    }
+    else if (internalStatus === "FAILED") {
+        logger_1.logger.warn(CONTEXT, "SMS definitivement en echec");
     }
     return {
         ok: true,

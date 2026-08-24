@@ -50,6 +50,7 @@ export declare class OrangeSmsService {
     private readonly maxRetries;
     constructor(config: OrangeSmsConfig, fetchImpl?: FetchLike);
     invalidateToken(): void;
+    private hasValidAccessToken;
     getAccessToken(): Promise<string>;
     sendSms(phone: string, message: string): Promise<SmsResult>;
     sendOrderSms(tableNumber: string, message: string): Promise<SmsResult>;

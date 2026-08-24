@@ -5,6 +5,7 @@ import {
   createSmsNotification,
   updateSmsNotificationById,
 } from "../repositories/sms-notifications.repository";
+import { maskPhoneNumber } from "../utils/sms";
 
 const CONTEXT = "SMS";
 
@@ -43,7 +44,7 @@ export async function dispatchOrderSms(
     authorization: process.env.ORANGE_AUTHORIZATION || "",
     clientId: process.env.ORANGE_CLIENT_ID || "",
     clientSecret: process.env.ORANGE_CLIENT_SECRET || "",
-    senderAddress: process.env.ORANGE_SENDER_ADDRESS || "",
+    senderAddress: process.env.ORANGE_SMS_SENDER || "",
   })
 ): Promise<DispatchOrderSmsResult> {
   logger.info(CONTEXT, `notification requested (order #${input.orderId}, table ${input.tableNumber})`);
@@ -62,6 +63,12 @@ export async function dispatchOrderSms(
 
   for (const phone of recipients) {
     const requestedAt = new Date();
+    logger.info(CONTEXT, "SMS recipient prepare", {
+      orderId: input.orderId,
+      tableNumber: input.tableNumber,
+      recipientMasked: maskPhoneNumber(phone),
+      requestedAt: requestedAt.toISOString(),
+    });
     const notification = await createSmsNotification({
       orderId: input.orderId,
       recipientPhone: phone,
@@ -72,6 +79,21 @@ export async function dispatchOrderSms(
     });
 
     const result = await service.sendSms(phone, input.message);
+    logger.info(CONTEXT, "SMS recipient result", {
+      orderId: input.orderId,
+      notificationId: notification.id,
+      recipientMasked: maskPhoneNumber(phone),
+      success: result.success,
+      errorKind: result.errorKind || null,
+      errorMessage: result.errorMessage || null,
+      attemptCount: result.attemptCount ?? 0,
+      httpStatus: result.httpStatus ?? null,
+      orangeResourceId: result.orangeResourceId ?? null,
+      orangeRequestId: result.orangeRequestId ?? null,
+      acceptedAt: result.acceptedAt || null,
+      requestCompletedAt: result.requestCompletedAt || null,
+      requestDurationMs: result.requestDurationMs ?? null,
+    });
     perRecipient.push({ phone, notificationId: notification.id, result });
 
     const retryCount = Math.max(0, (result.attemptCount ?? 1) - 1);
@@ -81,6 +103,12 @@ export async function dispatchOrderSms(
 
     if (orangeResourceId) {
       await attachOrangeResourceId(notification.id, orangeResourceId, orangeRequestId);
+      logger.info(CONTEXT, "SMS orange resource attached", {
+        orderId: input.orderId,
+        notificationId: notification.id,
+        orangeResourceId,
+        orangeRequestId,
+      });
     }
 
     await updateSmsNotificationById(notification.id, {
@@ -99,6 +127,13 @@ export async function dispatchOrderSms(
       requestDurationMs: result.requestDurationMs ?? null,
       deliveryLatencyMs: null,
       totalLatencyMs: null,
+    });
+
+    logger.info(CONTEXT, "SMS notification row updated", {
+      orderId: input.orderId,
+      notificationId: notification.id,
+      status,
+      retryCount,
     });
   }
 

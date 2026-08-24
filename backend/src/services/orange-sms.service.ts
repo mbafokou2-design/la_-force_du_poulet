@@ -84,6 +84,14 @@ function buildOrangeSmsUrl(senderAddress: string): string {
   return `https://api.orange.com/smsmessaging/v1/outbound/${encodeURIComponent(senderAddress)}/requests`;
 }
 
+function summarizeSmsMessage(message: string): { length: number; preview: string } {
+  const clean = message.replace(/\s+/g, " ").trim();
+  return {
+    length: clean.length,
+    preview: clean.length > 120 ? `${clean.slice(0, 117)}...` : clean,
+  };
+}
+
 export function maskPhoneNumber(phone: string): string {
   return maskPhoneNumberShared(phone);
 }
@@ -234,6 +242,55 @@ function extractMessageId(payload: unknown, headers: Headers): string | undefine
   return undefined;
 }
 
+function extractOrangeIdentifiers(
+  payload: unknown,
+  headers: Headers
+): {
+  resourceURL: string | null;
+  id: string | null;
+  messageId: string | null;
+  requestId: string | null;
+  location: string | null;
+  xRequestId: string | null;
+} {
+  const location = headers.get("location");
+  const xRequestId = headers.get("x-request-id");
+
+  const request =
+    payload && typeof payload === "object"
+      ? ((payload as { outboundSMSMessageRequest?: Record<string, unknown> }).outboundSMSMessageRequest ?? null)
+      : null;
+
+  const resourceURL = request && typeof request.resourceURL === "string" ? request.resourceURL : null;
+  const id =
+    request && typeof request.id === "string"
+      ? request.id
+      : payload && typeof payload === "object" && typeof (payload as { id?: unknown }).id === "string"
+        ? ((payload as { id: string }).id)
+        : null;
+  const messageId =
+    request && typeof request.messageId === "string"
+      ? request.messageId
+      : payload && typeof payload === "object" && typeof (payload as { messageId?: unknown }).messageId === "string"
+        ? ((payload as { messageId: string }).messageId)
+        : null;
+  const requestId =
+    request && typeof request.requestId === "string"
+      ? request.requestId
+      : request && typeof request.resourceId === "string"
+        ? request.resourceId
+        : null;
+
+  return {
+    resourceURL: resourceURL ? normalizeOrangeResourceId(resourceURL) || resourceURL : null,
+    id: id ? normalizeOrangeResourceId(id) || id : null,
+    messageId: messageId ? normalizeOrangeResourceId(messageId) || messageId : null,
+    requestId: requestId ? normalizeOrangeResourceId(requestId) || requestId : null,
+    location: location ? normalizeOrangeResourceId(location) || location : null,
+    xRequestId: xRequestId ? normalizeOrangeResourceId(xRequestId) || xRequestId : null,
+  };
+}
+
 function logKind(kind: SmsErrorKind, message: string): void {
   logger.error(CONTEXT, message);
   switch (kind) {
@@ -274,7 +331,7 @@ function loadConfigFromEnv(): OrangeSmsConfig {
     authorization: process.env.ORANGE_AUTHORIZATION || "",
     clientId: process.env.ORANGE_CLIENT_ID || "",
     clientSecret: process.env.ORANGE_CLIENT_SECRET || "",
-    senderAddress: process.env.ORANGE_SENDER_ADDRESS || "",
+    senderAddress: process.env.ORANGE_SMS_SENDER || "",
   };
 }
 
@@ -298,7 +355,7 @@ export function validateOrangeSmsConfig(config: OrangeSmsConfig): void {
   if (!config.authorization) missing.push("ORANGE_AUTHORIZATION");
   if (!config.clientId) missing.push("ORANGE_CLIENT_ID");
   if (!config.clientSecret) missing.push("ORANGE_CLIENT_SECRET");
-  if (!config.senderAddress) missing.push("ORANGE_SENDER_ADDRESS");
+  if (!config.senderAddress) missing.push("ORANGE_SMS_SENDER");
 
   if (missing.length > 0) {
     throw new Error(`Orange SMS config missing: ${missing.join(", ")}`);
@@ -321,6 +378,10 @@ export class OrangeSmsService {
     this.tokenExpiresAt = 0;
   }
 
+  private hasValidAccessToken(now = Date.now()): boolean {
+    return Boolean(this.accessToken && now < this.tokenExpiresAt - TOKEN_REFRESH_MARGIN_MS);
+  }
+
   async getAccessToken(): Promise<string> {
     const now = Date.now();
     if (this.accessToken && now < this.tokenExpiresAt - TOKEN_REFRESH_MARGIN_MS) {
@@ -330,7 +391,7 @@ export class OrangeSmsService {
     if (!this.config.authorization || !this.config.clientId || !this.config.clientSecret || !this.config.senderAddress) {
       throw new OrangeSmsError(
         "config",
-        "Orange config missing (ORANGE_CLIENT_ID, ORANGE_CLIENT_SECRET, ORANGE_AUTHORIZATION or ORANGE_SENDER_ADDRESS missing).",
+        "Orange config missing (ORANGE_CLIENT_ID, ORANGE_CLIENT_SECRET, ORANGE_AUTHORIZATION or ORANGE_SMS_SENDER missing).",
         { retryable: false }
       );
     }
@@ -398,10 +459,15 @@ export class OrangeSmsService {
 
     try {
       logger.info(CONTEXT, `notification requested`);
-      logger.info(CONTEXT, `envoi demarre vers ${masked}`);
+      logger.info(
+        CONTEXT,
+        `Orange SMS request prepared -> senderUsed="${this.config.senderAddress}", maskedRecipient="${masked}", url="${orangeSmsUrl}"`
+      );
+      logger.info(CONTEXT, `Orange API URL -> ${orangeSmsUrl}`);
+      logger.info(CONTEXT, `Orange HTTP method -> POST`);
+      logger.info(CONTEXT, `OAuth token status -> ${this.hasValidAccessToken() ? "cached" : "fetching"}`);
       const payload = await this.sendSmsWithRetry(address, message, masked, requestedAt, orangeSmsUrl);
-      logger.info(CONTEXT, `Orange HTTP ${payload.status}`);
-      logger.info(CONTEXT, "SMS accepted by Orange");
+      logger.info(CONTEXT, `Orange SMS accepted -> httpStatus=${payload.status}, attempts=${payload.attemptCount ?? 0}`);
       if (payload.messageId) {
         logger.info(CONTEXT, `Orange resource ID ${payload.messageId}`);
       }
@@ -500,7 +566,23 @@ export class OrangeSmsService {
       const attemptStartedAt = new Date();
 
       try {
+        logger.info(CONTEXT, `SMS request started -> attempt ${attempt + 1}/${this.maxRetries + 1}`);
         const token = await this.getAccessToken();
+        logger.info(CONTEXT, "OAuth token obtained -> yes");
+        const messageSummary = summarizeSmsMessage(message);
+        logger.info(
+          CONTEXT,
+          `SMS request payload -> ${JSON.stringify({
+            event: "SMS request payload",
+            senderUsed: this.config.senderAddress,
+            maskedRecipient: masked,
+            recipientAddress: address,
+            messageLength: messageSummary.length,
+            messagePreview: messageSummary.preview,
+            method: "POST",
+            url: orangeSmsUrl,
+          })}`
+        );
         const response = await this.request(orangeSmsUrl, {
           method: "POST",
           headers: {
@@ -518,7 +600,9 @@ export class OrangeSmsService {
 
         const rawBody = await response.text();
         const requestDurationMs = Date.now() - attemptStartedMs;
-        logger.info(CONTEXT, `Orange HTTP ${response.status} (vers ${masked})`);
+        logger.info(CONTEXT, `Orange HTTP ${response.status} (recipient ${masked})`);
+        logger.info(CONTEXT, `Orange HTTP status returned -> ${response.status}`);
+        logger.info(CONTEXT, `Orange response body returned -> ${redactSecrets(rawBody).slice(0, 800) || "[empty]"}`);
 
         if (response.status === 401 && !tokenRefreshedAfter401) {
           tokenRefreshedAfter401 = true;
@@ -528,6 +612,7 @@ export class OrangeSmsService {
         }
 
         if (!response.ok) {
+          logger.warn(CONTEXT, `Orange response body (error): ${redactSecrets(rawBody).slice(0, 800)}`);
           const classified = classifyHttpError(response.status, rawBody);
           throw new OrangeSmsError(classified.kind, classified.message, {
             status: response.status,
@@ -541,6 +626,12 @@ export class OrangeSmsService {
         } catch {
           parsed = null;
         }
+
+        const orangeIdentifiers = extractOrangeIdentifiers(parsed, response.headers);
+        logger.info(
+          CONTEXT,
+          `Orange identifiers -> ${JSON.stringify(orangeIdentifiers)}`
+        );
 
         const messageId = extractMessageId(parsed, response.headers);
         if (messageId) {

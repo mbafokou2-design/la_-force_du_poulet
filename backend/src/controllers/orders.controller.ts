@@ -85,13 +85,40 @@ export async function createOrderWithDeps(
     }
 
     await client.query("COMMIT");
-    logger.info(CONTEXT, `commande #${order.id} creee`);
+    logger.info(CONTEXT, `commande #${order.id} creee`, {
+      orderId: order.id,
+      tableNumber: table_number,
+      tableId,
+      itemCount: items.length,
+      totalAmount,
+      items: summarizeItems(items),
+    });
 
     const smsMessage = buildSmsMessage(table_number, items, totalAmount);
+    logger.info(CONTEXT, `SMS prepare pour commande #${order.id}`, {
+      orderId: order.id,
+      tableNumber: table_number,
+      messageLength: smsMessage.length,
+      messagePreview: smsMessage.length > 140 ? `${smsMessage.slice(0, 137)}...` : smsMessage,
+    });
     let smsResult: SmsResult = { success: false, errorMessage: "SMS non tente.", errorKind: "unknown" };
 
     try {
+      logger.info(CONTEXT, `SMS dispatch demarre pour commande #${order.id}`);
       smsResult = await sendOrderSms(table_number, smsMessage, order.id);
+      logger.info(CONTEXT, `SMS dispatch termine pour commande #${order.id}`, {
+        orderId: order.id,
+        success: smsResult.success,
+        errorKind: smsResult.errorKind || null,
+        errorMessage: smsResult.errorMessage || null,
+        attemptCount: smsResult.attemptCount ?? 0,
+        httpStatus: smsResult.httpStatus ?? null,
+        orangeResourceId: smsResult.orangeResourceId ?? null,
+        orangeRequestId: smsResult.orangeRequestId ?? null,
+        acceptedAt: smsResult.acceptedAt || null,
+        requestCompletedAt: smsResult.requestCompletedAt || null,
+        requestDurationMs: smsResult.requestDurationMs ?? null,
+      });
     } catch (smsErr: any) {
       smsResult = {
         success: false,
@@ -107,6 +134,7 @@ export async function createOrderWithDeps(
         smsResult.success ? null : smsResult.errorMessage || null,
         order.id,
       ]);
+      logger.info(CONTEXT, `ordre #${order.id} mis a jour avec sms_status=${smsResult.success ? "sent" : "failed"}`);
     } catch (updateOrderErr: any) {
       logger.error(CONTEXT, `Could not update sms_status for order #${order.id}`, updateOrderErr);
     }
@@ -132,6 +160,10 @@ export async function createOrderWithDeps(
 function buildSmsMessage(tableNumber: string, items: CartItem[], total: number): string {
   const lines = items.map((i) => `${i.qty}x ${i.name}`).join(", ");
   return `NOUVELLE COMMANDE - Table ${tableNumber}: ${lines}. Total: ${total} FCFA.`;
+}
+
+function summarizeItems(items: CartItem[]): string {
+  return items.map((item) => `${item.qty}x ${item.name}(${item.price})`).join(" | ");
 }
 
 /**

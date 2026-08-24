@@ -12,14 +12,14 @@ const CONFIG = {
   authorization: "Basic dGVzdA==",
   clientId: "client-id",
   clientSecret: "super-secret-value",
-  senderAddress: "tel:+2370000",
+  senderAddress: "SMS 725188",
 };
 
 const TOKEN_JSON = JSON.stringify({ access_token: "tok_abc", expires_in: 3600 });
 const SMS_OK_JSON = JSON.stringify({
   outboundSMSMessageRequest: {
     address: ["tel:+237650000000"],
-    senderAddress: "tel:+2370000",
+    senderAddress: "SMS 725188",
     resourceURL: "https://api.orange.com/smsmessaging/v1/outbound/requests/req-123",
   },
 });
