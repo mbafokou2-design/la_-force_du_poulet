@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import fs from "fs";
 import path from "path";
 import { logger } from "./utils/logger";
 import { isStaticAssetPath } from "./utils/sms";
@@ -14,6 +15,20 @@ import { requireAdminAuth } from "./middleware/admin-auth";
 
 const app = express();
 
+function firstExistingPath(candidates: string[]): string | null {
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+function getFrontendRoot(): string | null {
+  return firstExistingPath([
+    path.join(__dirname, "..", "public", "site"),
+    path.join(__dirname, "..", "..", "frontend"),
+  ]);
+}
+
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
@@ -27,8 +42,14 @@ app.use((req, res, next) => {
 
 app.use("/qrcodes", express.static(path.join(__dirname, "..", "public", "qrcodes")));
 app.use("/admin", express.static(path.join(__dirname, "..", "public", "admin")));
-app.use("/assets", express.static(path.join(__dirname, "..", "..", "frontend", "assets")));
-app.use(express.static(path.join(__dirname, "..", "..", "frontend")));
+
+const frontendRoot = getFrontendRoot();
+if (frontendRoot) {
+  app.use("/assets", express.static(path.join(frontendRoot, "assets")));
+  app.use(express.static(frontendRoot));
+} else {
+  logger.warn("HTTP", "Frontend static root introuvable; le menu client ne sera pas servi.");
+}
 
 app.use("/api/admin", adminRoutes);
 app.use("/api/webhooks", webhooksRoutes);

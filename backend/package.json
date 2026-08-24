@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-frontend.js",
     "lint": "tsc --noEmit",
     "start": "node dist/server.js",
     "test": "tsx --test src/__tests__/orange-sms.service.test.ts src/__tests__/orders.controller.test.ts src/__tests__/orange-webhook.controller.test.ts",
