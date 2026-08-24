@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { logger } from "../utils/logger";
+import { isDatabaseUnavailableError } from "../utils/db";
 import {
   findSmsNotificationById,
   getSmsStats,
@@ -106,6 +107,25 @@ export async function getSmsStatsController(req: Request, res: Response) {
     });
   } catch (err: any) {
     logger.error(CONTEXT, "getSmsStats failed", err);
+    if (isDatabaseUnavailableError(err)) {
+      logger.warn(CONTEXT, "DB indisponible: retour de statistiques SMS vides");
+      return res.json({
+        total_sms: 0,
+        accepted_sms: 0,
+        delivered_sms: 0,
+        pending_sms: 0,
+        failed_sms: 0,
+        delivery_rate: 0,
+        failure_rate: 0,
+        avg_request_duration_ms: 0,
+        avg_delivery_latency_ms: 0,
+        min_request_duration_ms: 0,
+        max_request_duration_ms: 0,
+        min_delivery_latency_ms: 0,
+        max_delivery_latency_ms: 0,
+        recent_distribution: [],
+      });
+    }
     return res.status(500).json({ error: "Erreur serveur lors du calcul des statistiques SMS.", detail: err.message });
   }
 }
@@ -125,6 +145,16 @@ export async function listSmsNotificationsController(req: Request, res: Response
     });
   } catch (err: any) {
     logger.error(CONTEXT, "listSmsNotifications failed", err);
+    if (isDatabaseUnavailableError(err)) {
+      logger.warn(CONTEXT, "DB indisponible: retour d'une liste SMS vide");
+      return res.json({
+        items: [],
+        page: filters.page,
+        limit: filters.limit,
+        total: 0,
+        total_pages: 1,
+      });
+    }
     return res.status(500).json({ error: "Erreur serveur lors de la récupération des SMS.", detail: err.message });
   }
 }
@@ -144,7 +174,9 @@ export async function getSmsNotificationController(req: Request, res: Response) 
     return res.json(mapRow(row));
   } catch (err: any) {
     logger.error(CONTEXT, `getSmsNotification failed for id=${id}`, err);
+    if (isDatabaseUnavailableError(err)) {
+      return res.status(404).json({ error: "SMS introuvable." });
+    }
     return res.status(500).json({ error: "Erreur serveur lors de la récupération du SMS.", detail: err.message });
   }
 }
-

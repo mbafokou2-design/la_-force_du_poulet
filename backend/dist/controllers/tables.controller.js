@@ -11,6 +11,7 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const db_1 = require("../config/db");
 const logger_1 = require("../utils/logger");
+const db_2 = require("../utils/db");
 const CONTEXT = "tables.controller.ts";
 const QR_FOLDER = path_1.default.join(__dirname, "..", "..", "public", "qrcodes");
 const FRONTEND_BASE_URL = process.env.PUBLIC_BASE_URL ||
@@ -64,6 +65,10 @@ async function getTables(req, res) {
     }
     catch (err) {
         logger_1.logger.error(CONTEXT, "Échec getTables", err);
+        if ((0, db_2.isDatabaseUnavailableError)(err)) {
+            logger_1.logger.warn(CONTEXT, "DB indisponible: retour d'une liste de tables vide");
+            return res.json([]);
+        }
         return res.status(500).json({ error: "Erreur serveur lors de la récupération des tables.", detail: err.message });
     }
 }

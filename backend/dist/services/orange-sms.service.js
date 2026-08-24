@@ -345,7 +345,9 @@ class OrangeSmsService {
         const requestedAt = new Date();
         const orangeSmsUrl = buildOrangeSmsUrl(this.config.senderAddress);
         try {
-            logger_1.logger.info(CONTEXT, `notification requested`);
+            logger_1.logger.info(CONTEXT, "[SMS TEST] Orange request starting");
+            logger_1.logger.info(CONTEXT, `[SMS TEST] senderAddress réellement envoyé: ${this.config.senderAddress}`);
+            logger_1.logger.info(CONTEXT, `[SMS TEST] recipient: ${masked}`);
             logger_1.logger.info(CONTEXT, `Orange SMS request prepared -> senderUsed="${this.config.senderAddress}", maskedRecipient="${masked}", url="${orangeSmsUrl}"`);
             logger_1.logger.info(CONTEXT, `Orange API URL -> ${orangeSmsUrl}`);
             logger_1.logger.info(CONTEXT, `Orange HTTP method -> POST`);
@@ -458,6 +460,7 @@ class OrangeSmsService {
                 logger_1.logger.info(CONTEXT, `Orange HTTP ${response.status} (recipient ${masked})`);
                 logger_1.logger.info(CONTEXT, `Orange HTTP status returned -> ${response.status}`);
                 logger_1.logger.info(CONTEXT, `Orange response body returned -> ${redactSecrets(rawBody).slice(0, 800) || "[empty]"}`);
+                logger_1.logger.info(CONTEXT, `[SMS TEST] HTTP status: ${response.status}`);
                 if (response.status === 401 && !tokenRefreshedAfter401) {
                     tokenRefreshedAfter401 = true;
                     this.invalidateToken();
@@ -484,7 +487,9 @@ class OrangeSmsService {
                 const messageId = extractMessageId(parsed, response.headers);
                 if (messageId) {
                     logger_1.logger.info(CONTEXT, `Orange resource ID ${messageId}`);
+                    logger_1.logger.info(CONTEXT, `[SMS TEST] Orange Resource ID: ${messageId}`);
                 }
+                logger_1.logger.info(CONTEXT, `[SMS TEST] Response accepted: ${response.ok ? "true" : "false"}`);
                 const requestCompletedAt = new Date().toISOString();
                 return {
                     messageId,

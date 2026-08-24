@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { pool } from "../config/db";
 import { logger } from "../utils/logger";
+import { isDatabaseUnavailableError } from "../utils/db";
 
 const CONTEXT = "dashboard.controller.ts";
 
@@ -49,6 +50,17 @@ export async function getStats(req: Request, res: Response) {
     });
   } catch (err: any) {
     logger.error(CONTEXT, "Échec getStats", err);
+    if (isDatabaseUnavailableError(err)) {
+      logger.warn(CONTEXT, "DB indisponible: retour des statistiques vides");
+      return res.json({
+        total_orders: 0,
+        total_revenue: 0,
+        orders_today: 0,
+        revenue_today: 0,
+        top_products: [],
+        by_table: [],
+      });
+    }
     return res.status(500).json({ error: "Erreur serveur lors du calcul des statistiques.", detail: err.message });
   }
 }

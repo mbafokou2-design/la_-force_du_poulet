@@ -4,6 +4,7 @@ exports.getSmsStatsController = getSmsStatsController;
 exports.listSmsNotificationsController = listSmsNotificationsController;
 exports.getSmsNotificationController = getSmsNotificationController;
 const logger_1 = require("../utils/logger");
+const db_1 = require("../utils/db");
 const sms_notifications_repository_1 = require("../repositories/sms-notifications.repository");
 const sms_1 = require("../utils/sms");
 const CONTEXT = "SMS";
@@ -102,6 +103,25 @@ async function getSmsStatsController(req, res) {
     }
     catch (err) {
         logger_1.logger.error(CONTEXT, "getSmsStats failed", err);
+        if ((0, db_1.isDatabaseUnavailableError)(err)) {
+            logger_1.logger.warn(CONTEXT, "DB indisponible: retour de statistiques SMS vides");
+            return res.json({
+                total_sms: 0,
+                accepted_sms: 0,
+                delivered_sms: 0,
+                pending_sms: 0,
+                failed_sms: 0,
+                delivery_rate: 0,
+                failure_rate: 0,
+                avg_request_duration_ms: 0,
+                avg_delivery_latency_ms: 0,
+                min_request_duration_ms: 0,
+                max_request_duration_ms: 0,
+                min_delivery_latency_ms: 0,
+                max_delivery_latency_ms: 0,
+                recent_distribution: [],
+            });
+        }
         return res.status(500).json({ error: "Erreur serveur lors du calcul des statistiques SMS.", detail: err.message });
     }
 }
@@ -120,6 +140,16 @@ async function listSmsNotificationsController(req, res) {
     }
     catch (err) {
         logger_1.logger.error(CONTEXT, "listSmsNotifications failed", err);
+        if ((0, db_1.isDatabaseUnavailableError)(err)) {
+            logger_1.logger.warn(CONTEXT, "DB indisponible: retour d'une liste SMS vide");
+            return res.json({
+                items: [],
+                page: filters.page,
+                limit: filters.limit,
+                total: 0,
+                total_pages: 1,
+            });
+        }
         return res.status(500).json({ error: "Erreur serveur lors de la récupération des SMS.", detail: err.message });
     }
 }
@@ -137,6 +167,9 @@ async function getSmsNotificationController(req, res) {
     }
     catch (err) {
         logger_1.logger.error(CONTEXT, `getSmsNotification failed for id=${id}`, err);
+        if ((0, db_1.isDatabaseUnavailableError)(err)) {
+            return res.status(404).json({ error: "SMS introuvable." });
+        }
         return res.status(500).json({ error: "Erreur serveur lors de la récupération du SMS.", detail: err.message });
     }
 }

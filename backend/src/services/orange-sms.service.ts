@@ -458,11 +458,10 @@ export class OrangeSmsService {
     const orangeSmsUrl = buildOrangeSmsUrl(this.config.senderAddress);
 
     try {
-      logger.info(CONTEXT, `notification requested`);
-      logger.info(
-        CONTEXT,
-        `Orange SMS request prepared -> senderUsed="${this.config.senderAddress}", maskedRecipient="${masked}", url="${orangeSmsUrl}"`
-      );
+      logger.info(CONTEXT, "[SMS TEST] Orange request starting");
+      logger.info(CONTEXT, `[SMS TEST] senderAddress réellement envoyé: ${this.config.senderAddress}`);
+      logger.info(CONTEXT, `[SMS TEST] recipient: ${masked}`);
+      logger.info(CONTEXT, `Orange SMS request prepared -> senderUsed="${this.config.senderAddress}", maskedRecipient="${masked}", url="${orangeSmsUrl}"`);
       logger.info(CONTEXT, `Orange API URL -> ${orangeSmsUrl}`);
       logger.info(CONTEXT, `Orange HTTP method -> POST`);
       logger.info(CONTEXT, `OAuth token status -> ${this.hasValidAccessToken() ? "cached" : "fetching"}`);
@@ -603,6 +602,7 @@ export class OrangeSmsService {
         logger.info(CONTEXT, `Orange HTTP ${response.status} (recipient ${masked})`);
         logger.info(CONTEXT, `Orange HTTP status returned -> ${response.status}`);
         logger.info(CONTEXT, `Orange response body returned -> ${redactSecrets(rawBody).slice(0, 800) || "[empty]"}`);
+        logger.info(CONTEXT, `[SMS TEST] HTTP status: ${response.status}`);
 
         if (response.status === 401 && !tokenRefreshedAfter401) {
           tokenRefreshedAfter401 = true;
@@ -636,8 +636,10 @@ export class OrangeSmsService {
         const messageId = extractMessageId(parsed, response.headers);
         if (messageId) {
           logger.info(CONTEXT, `Orange resource ID ${messageId}`);
+          logger.info(CONTEXT, `[SMS TEST] Orange Resource ID: ${messageId}`);
         }
 
+        logger.info(CONTEXT, `[SMS TEST] Response accepted: ${response.ok ? "true" : "false"}`);
         const requestCompletedAt = new Date().toISOString();
         return {
           messageId,

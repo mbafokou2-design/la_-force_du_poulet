@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { pool } from "../config/db";
 import { logger } from "../utils/logger";
+import { isDatabaseUnavailableError } from "../utils/db";
 
 const CONTEXT = "tables.controller.ts";
 
@@ -73,6 +74,10 @@ export async function getTables(req: Request, res: Response) {
     return res.json(result.rows);
   } catch (err: any) {
     logger.error(CONTEXT, "Échec getTables", err);
+    if (isDatabaseUnavailableError(err)) {
+      logger.warn(CONTEXT, "DB indisponible: retour d'une liste de tables vide");
+      return res.json([]);
+    }
     return res.status(500).json({ error: "Erreur serveur lors de la récupération des tables.", detail: err.message });
   }
 }

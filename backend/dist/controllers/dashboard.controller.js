@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getStats = getStats;
 const db_1 = require("../config/db");
 const logger_1 = require("../utils/logger");
+const db_2 = require("../utils/db");
 const CONTEXT = "dashboard.controller.ts";
 /**
  * GET /api/dashboard/stats
@@ -40,6 +41,17 @@ async function getStats(req, res) {
     }
     catch (err) {
         logger_1.logger.error(CONTEXT, "Échec getStats", err);
+        if ((0, db_2.isDatabaseUnavailableError)(err)) {
+            logger_1.logger.warn(CONTEXT, "DB indisponible: retour des statistiques vides");
+            return res.json({
+                total_orders: 0,
+                total_revenue: 0,
+                orders_today: 0,
+                revenue_today: 0,
+                top_products: [],
+                by_table: [],
+            });
+        }
         return res.status(500).json({ error: "Erreur serveur lors du calcul des statistiques.", detail: err.message });
     }
 }
