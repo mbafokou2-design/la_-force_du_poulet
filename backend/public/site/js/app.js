@@ -195,6 +195,23 @@ function saveLastOrder(order) {
   } catch (e) {}
 }
 
+function updateOrderLiveStrip(order) {
+  const strip = document.getElementById("orderLiveStrip");
+  const text = document.getElementById("orderLiveText");
+  if (!strip || !text) return;
+
+  const activeOrder = order || lastOrder;
+  if (!activeOrder || !activeOrder.orderId) {
+    strip.hidden = true;
+    return;
+  }
+
+  strip.hidden = false;
+  const tableLabel = `Table N° ${activeOrder.tableNumber < 10 ? "0" + activeOrder.tableNumber : activeOrder.tableNumber}`;
+  const smsLabel = activeOrder.smsStatus ? ` - SMS ${String(activeOrder.smsStatus).toUpperCase()}` : "";
+  text.textContent = `Commande #${activeOrder.orderId} envoyée pour ${tableLabel}${smsLabel}`;
+}
+
 function findProduct(id) {
   return PRODUCTS.find((p) => p.id === id);
 }
@@ -441,6 +458,10 @@ function renderOrderSummary(order) {
   const subtitle = snapshot.createdAt
     ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(snapshot.createdAt))
     : "";
+  const statusClass =
+    snapshot.orderId && String(snapshot.smsStatus || "").toLowerCase() === "sent"
+      ? "order-summary-status is-live"
+      : "order-summary-status";
 
   content.innerHTML = `
     <div class="order-summary-meta">
@@ -456,7 +477,7 @@ function renderOrderSummary(order) {
       <span>Note</span>
       <p>${snapshot.note ? snapshot.note : "Aucune note"}</p>
     </div>
-    ${snapshot.orderId ? `<div class="order-summary-status">Commande #${snapshot.orderId}${snapshot.smsStatus ? ` - SMS ${snapshot.smsStatus}` : ""}</div>` : ""}
+    ${snapshot.orderId ? `<div class="${statusClass}">Commande #${snapshot.orderId}${snapshot.smsStatus ? ` - SMS ${snapshot.smsStatus}` : ""}</div>` : ""}
   `;
 
   if (actionBtn) {
@@ -686,6 +707,7 @@ async function checkout() {
     };
     saveLastOrder(savedOrder);
     renderOrderSummary(savedOrder);
+    updateOrderLiveStrip(savedOrder);
     showToast(msg);
     cart = [];
     saveCart();
@@ -721,6 +743,7 @@ function init() {
   renderFilters();
   renderProducts();
   renderCart();
+  updateOrderLiveStrip(lastOrder);
 
   // Recherche
   const searchInput = document.getElementById("searchInput");
