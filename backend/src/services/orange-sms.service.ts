@@ -5,6 +5,7 @@ import {
   normalizeOrangeAddress,
   normalizeOrangeResourceId,
 } from "../utils/sms";
+import { getSmsRecipients } from "../repositories/sms-recipients.repository";
 
 dotenv.config();
 
@@ -340,7 +341,7 @@ if (!bootConfig.authorization || !bootConfig.clientId || !bootConfig.clientSecre
   logger.warn(CONTEXT, "Orange SMS config missing in .env; SMS sending will fail.");
 }
 if (staffPhoneNumbers().length === 0) {
-  logger.warn(CONTEXT, "STAFF_PHONE_NUMBERS is empty; no staff SMS will be sent.");
+  logger.info(CONTEXT, "STAFF_PHONE_NUMBERS is empty in .env; database-managed recipients will be used if configured.");
 }
 
 function staffPhoneNumbers(): string[] {
@@ -513,9 +514,9 @@ export class OrangeSmsService {
       return { success: false, errorMessage, errorKind: "config" };
     }
 
-    const numbers = staffPhoneNumbers();
+    const numbers = await getSmsRecipients();
     if (numbers.length === 0) {
-      const errorMessage = "No staff phone numbers configured (STAFF_PHONE_NUMBERS).";
+      const errorMessage = "No staff phone numbers configured.";
       logger.error(CONTEXT, errorMessage);
       return { success: false, errorMessage, errorKind: "config" };
     }

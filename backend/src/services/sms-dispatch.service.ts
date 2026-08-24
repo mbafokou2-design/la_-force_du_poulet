@@ -5,16 +5,10 @@ import {
   createSmsNotification,
   updateSmsNotificationById,
 } from "../repositories/sms-notifications.repository";
+import { getSmsRecipients } from "../repositories/sms-recipients.repository";
 import { maskPhoneNumber } from "../utils/sms";
 
 const CONTEXT = "SMS";
-
-function staffPhoneNumbers(): string[] {
-  return (process.env.STAFF_PHONE_NUMBERS || "")
-    .split(",")
-    .map((n) => n.trim())
-    .filter(Boolean);
-}
 
 function toStatus(result: SmsResult): "ACCEPTED" | "FAILED" | "UNKNOWN" {
   if (result.success) return "ACCEPTED";
@@ -49,12 +43,12 @@ export async function dispatchOrderSms(
 ): Promise<DispatchOrderSmsResult> {
   logger.info(CONTEXT, `notification requested (order #${input.orderId}, table ${input.tableNumber})`);
 
-  const recipients = staffPhoneNumbers();
+  const recipients = await getSmsRecipients();
   if (recipients.length === 0) {
     return {
       success: false,
       errorKind: "config",
-      errorMessage: "No staff phone numbers configured (STAFF_PHONE_NUMBERS).",
+      errorMessage: "No staff phone numbers configured.",
       recipients: [],
     };
   }

@@ -20,6 +20,11 @@ const smsState = {
   selectedSms: null,
 };
 
+const recipientState = {
+  recipients: [],
+  defaultRecipients: [],
+};
+
 function formatFCFA(amount) {
   return `${Number(amount || 0).toLocaleString("fr-FR")} FCFA`;
 }
@@ -112,6 +117,13 @@ function renderSimpleStats(prefix, stats) {
   if (failed) failed.textContent = stats.failed_sms ?? 0;
   if (rate) rate.textContent = formatPercent(stats.delivery_rate ?? 0);
   if (latency) latency.textContent = formatMs(stats.avg_delivery_latency_ms ?? 0);
+}
+
+function maskRecipientLabel(phone) {
+  const trimmed = String(phone || "").trim();
+  if (!trimmed) return "—";
+  const visible = trimmed.replace(/\D/g, "").slice(-4);
+  return visible ? `${trimmed.slice(0, Math.max(0, trimmed.length - visible.length))}••••${visible}` : trimmed;
 }
 
 function getSmsQueryString() {
@@ -228,6 +240,82 @@ function openSmsDetail(sms) {
   modal.classList.add("open");
 }
 
+function renderSmsRecipients() {
+  const container = document.getElementById("smsRecipientsList");
+  if (!container) return;
+
+  const recipients = Array.isArray(recipientState.recipients) ? recipientState.recipients : [];
+  const defaultRecipients = Array.isArray(recipientState.defaultRecipients) ? recipientState.defaultRecipients : [];
+
+  if (recipients.length === 0) {
+    container.innerHTML = `
+      <div class="sms-recipients-empty">
+        <strong>Aucun numero configure.</strong>
+        <span>Ajoute un numero pour recevoir les SMS de commandes.</span>
+        ${
+          defaultRecipients.length
+            ? `<small>Valeur par defaut depuis .env: ${defaultRecipients.map((value) => `<code>${value}</code>`).join(", ")}</small>`
+            : `<small>Aucune valeur par defaut n'est definie dans .env.</small>`
+        }
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = recipients
+    .map((phone) => {
+      const isDefault = defaultRecipients.includes(phone);
+      return `
+        <div class="sms-recipient-chip">
+          <div class="sms-recipient-chip-info">
+            <strong>${phone}</strong>
+            <span>${maskPhoneLabel(phone)}${isDefault ? " - defaut .env" : ""}</span>
+          </div>
+          <button type="button" class="sms-recipient-remove" data-remove-recipient="${phone}">Supprimer</button>
+        </div>
+      `;
+    })
+    .join("");
+
+  container.querySelectorAll("[data-remove-recipient]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const phone = btn.dataset.removeRecipient;
+      if (!phone) return;
+      await removeSmsRecipient(phone);
+    });
+  });
+}
+
+function maskPhoneLabel(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (digits.length < 4) return "••••";
+  return `••••${digits.slice(-4)}`;
+}
+
+async function loadSmsRecipients() {
+  const data = await apiCall("/api/admin/sms-recipients");
+  recipientState.recipients = data.recipients || [];
+  recipientState.defaultRecipients = data.default_recipients || [];
+  renderSmsRecipients();
+}
+
+async function addSmsRecipient(phone) {
+  await apiCall("/api/admin/sms-recipients", {
+    method: "POST",
+    body: JSON.stringify({ phone }),
+  });
+  await loadSmsRecipients();
+  showToast("Numero ajoute.");
+}
+
+async function removeSmsRecipient(phone) {
+  await apiCall(`/api/admin/sms-recipients/${encodeURIComponent(phone)}`, {
+    method: "DELETE",
+  });
+  await loadSmsRecipients();
+  showToast("Numero supprime.");
+}
+
 function closeSmsDetail() {
   const overlay = document.getElementById("smsDetailOverlay");
   const modal = document.getElementById("smsDetailModal");
@@ -239,6 +327,16 @@ function closeSmsDetail() {
 function showLoginOverlay(show) {
   const overlay = document.getElementById("adminLoginOverlay");
   if (!overlay) return;
+  overlay.hidden = !show;
+  overlay.setAttribute("aria-hidden", show ? "false" : "true");
+  overlay.style.display = show ? "flex" : "none";
+}
+
+function showLoadingOverlay(show, message = "Récupération des données...") {
+  const overlay = document.getElementById("adminLoadingOverlay");
+  const text = document.getElementById("adminLoadingText");
+  if (!overlay) return;
+  if (text) text.textContent = message;
   overlay.hidden = !show;
   overlay.setAttribute("aria-hidden", show ? "false" : "true");
   overlay.style.display = show ? "flex" : "none";
@@ -434,7 +532,13 @@ async function refreshSms() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadStats(), loadTables(), refreshSms()]);
+  const results = await Promise.allSettled([loadStats(), loadTables(), refreshSms(), loadSmsRecipients()]);
+  const rejected = results.filter((result) => result.status === "rejected");
+  if (rejected.length > 0) {
+    const firstError = rejected[0].reason;
+    logError("refreshAll", firstError);
+    showToast("Certaines données n'ont pas pu être chargées.", true);
+  }
 }
 
 function readSmsFiltersFromForm() {
@@ -508,6 +612,39 @@ function wireEvents() {
   document.getElementById("closeSmsDetailBtn").addEventListener("click", closeSmsDetail);
   document.getElementById("smsDetailOverlay").addEventListener("click", closeSmsDetail);
 
+  document.getElementById("refreshRecipientsBtn").addEventListener("click", async () => {
+    await loadSmsRecipients();
+    showToast("Destinataires actualises.");
+  });
+
+  document.getElementById("smsRecipientForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const input = document.getElementById("smsRecipientInput");
+    const phone = input.value.trim();
+    if (!phone) {
+      showToast("Le numero est requis.", true);
+      return;
+    }
+
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Ajout...";
+    }
+
+    try {
+      await addSmsRecipient(phone);
+      input.value = "";
+    } catch (err) {
+      showToast(err.message || "Impossible d'ajouter ce numero.", true);
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Ajouter le numero";
+      }
+    }
+  });
+
   document.getElementById("adminLoginForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const code = document.getElementById("adminCodeInput").value.trim();
@@ -537,22 +674,28 @@ function wireEvents() {
 }
 
 async function init() {
+  showLoadingOverlay(true, "Vérification de la session admin...");
   wireEvents();
   const authed = await checkSession();
   if (!authed) {
+    showLoadingOverlay(false);
     showLoginOverlay(true);
     return;
   }
 
   try {
+    showLoadingOverlay(true, "Chargement des statistiques, tables et SMS...");
     await refreshAll();
   } catch (err) {
     if (err.status === 401) {
+      showLoadingOverlay(false);
       showLoginOverlay(true);
       return;
     }
     showToast("Impossible de charger les données du tableau de bord.", true);
     logError("initial load", err);
+  } finally {
+    showLoadingOverlay(false);
   }
 }
 

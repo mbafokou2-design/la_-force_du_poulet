@@ -1,5 +1,6 @@
 import { pool } from "../config/db";
 import { logger } from "../utils/logger";
+import { getDefaultSmsRecipients } from "../repositories/sms-recipients.repository";
 
 const CONTEXT = "SMS";
 
@@ -38,8 +39,22 @@ export async function ensureSmsSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_sms_notifications_provider ON sms_notifications(provider);
     CREATE INDEX IF NOT EXISTS idx_sms_notifications_recipient_phone ON sms_notifications(recipient_phone);
     CREATE INDEX IF NOT EXISTS idx_sms_notifications_orange_resource_id ON sms_notifications(orange_resource_id);
+
+    CREATE TABLE IF NOT EXISTS sms_delivery_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      staff_phone_numbers JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
   `);
+
+  const existing = await pool.query(`SELECT id FROM sms_delivery_settings WHERE id = 1`);
+  if (existing.rows.length === 0) {
+    await pool.query(
+      `INSERT INTO sms_delivery_settings (id, staff_phone_numbers) VALUES ($1, $2::jsonb)`,
+      [1, JSON.stringify(getDefaultSmsRecipients())]
+    );
+  }
 
   logger.info(CONTEXT, "sms_notifications schema ready");
 }
-

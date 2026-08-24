@@ -114,4 +114,48 @@ describe("createOrder — isolation SMS", () => {
     assert.equal(res.statusCode, 201);
     assert.equal(res.body.sms_status, "failed");
   });
+
+  it("relache le client DB avant d'envoyer le SMS", async () => {
+    let released = false;
+
+    const client = {
+      query: mock.fn(async (sql: string) => {
+        if (sql.includes("BEGIN")) return { rows: [] };
+        if (sql.includes("SELECT id FROM tables")) return { rows: [] };
+        if (sql.includes("INSERT INTO orders")) {
+          return { rows: [{ id: 99, table_number: "5", total_amount: 2400 }] };
+        }
+        if (sql.includes("INSERT INTO order_items")) return { rows: [] };
+        if (sql.includes("COMMIT")) return { rows: [] };
+        if (sql.includes("ROLLBACK")) return { rows: [] };
+        return { rows: [] };
+      }),
+      release: mock.fn(() => {
+        released = true;
+      }),
+    };
+
+    const res = mockRes();
+    await createOrderWithDeps(
+      mockReq({
+        table_number: "5",
+        items: [{ id: "chicken-wrap", name: "Wrap poulet", price: 2400, qty: 1 }],
+      }),
+      res,
+      {
+        pool: {
+          connect: async () => client,
+          query: async () => ({ rows: [] }),
+        },
+        sendOrderSms: async () => {
+          assert.equal(released, true);
+          return { success: true, messageId: "msg-1" };
+        },
+      }
+    );
+
+    assert.equal(res.statusCode, 201);
+    assert.equal(res.body.sms_status, "sent");
+    assert.equal(released, true);
+  });
 });
