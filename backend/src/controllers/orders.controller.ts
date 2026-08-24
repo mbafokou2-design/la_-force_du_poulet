@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
 import { pool } from "../config/db";
 import { logger } from "../utils/logger";
-import { sendOrderSms as sendOrderSmsDefault, SmsResult } from "../services/orange-sms.service";
+import { SmsResult } from "../services/orange-sms.service";
+import { dispatchOrderSms } from "../services/sms-dispatch.service";
 
-const CONTEXT = "orders.controller.ts";
+const CONTEXT = "ORDERS";
 
 interface CartItem {
   id: string;
@@ -22,14 +23,19 @@ type QueryablePool = {
 
 export type CreateOrderDependencies = {
   pool: QueryablePool;
-  sendOrderSms: (tableNumber: string, message: string) => Promise<SmsResult>;
+  sendOrderSms: (tableNumber: string, message: string, orderId?: number) => Promise<SmsResult>;
 };
+
+async function sendOrderSmsDefault(tableNumber: string, message: string, orderId?: number): Promise<SmsResult> {
+  return dispatchOrderSms({
+    orderId: orderId ?? null,
+    tableNumber,
+    message,
+  });
+}
 
 /**
  * POST /api/orders
- * Reçoit le panier validé depuis le frontend client, l'enregistre en base,
- * puis tente d'envoyer le SMS récap au staff via Orange SMS.
- * body: { table_number: string, items: CartItem[] }
  */
 export async function createOrder(req: Request, res: Response) {
   return createOrderWithDeps(req, res);
@@ -44,14 +50,13 @@ export async function createOrderWithDeps(
   const sendOrderSms = deps?.sendOrderSms ?? sendOrderSmsDefault;
   const { table_number, items } = req.body as { table_number: string; items: CartItem[] };
 
-  // --- Validation d'entrée ---
   if (!table_number) {
-    logger.warn(CONTEXT, "createOrder appelé sans table_number", req.body);
+    logger.warn(CONTEXT, "createOrder called without table_number");
     return res.status(400).json({ error: "table_number est requis." });
   }
 
   if (!Array.isArray(items) || items.length === 0) {
-    logger.warn(CONTEXT, `createOrder appelé avec un panier vide (table ${table_number})`);
+    logger.warn(CONTEXT, `createOrder called with empty cart (table ${table_number})`);
     return res.status(400).json({ error: "Le panier est vide." });
   }
 
@@ -60,7 +65,6 @@ export async function createOrderWithDeps(
   try {
     await client.query("BEGIN");
 
-    // Cherche l'id de la table si elle existe (sinon on garde juste le numéro brut)
     const tableLookup = await client.query(`SELECT id FROM tables WHERE table_number = $1`, [table_number]);
     const tableId = tableLookup.rows[0]?.id || null;
 
@@ -81,32 +85,34 @@ export async function createOrderWithDeps(
     }
 
     await client.query("COMMIT");
-    logger.info(CONTEXT, `commande créée #${order.id} pour la table ${table_number} — ${totalAmount} FCFA`);
+    logger.info(CONTEXT, `commande #${order.id} creee`);
 
-    // --- Envoi SMS : ne doit jamais faire échouer la commande ---
-    let smsResult: SmsResult = { success: false, errorMessage: "SMS non tenté." };
+    const smsMessage = buildSmsMessage(table_number, items, totalAmount);
+    let smsResult: SmsResult = { success: false, errorMessage: "SMS non tente.", errorKind: "unknown" };
+
     try {
-      const smsMessage = buildSmsMessage(table_number, items, totalAmount);
-      smsResult = await sendOrderSms(table_number, smsMessage);
+      smsResult = await sendOrderSms(table_number, smsMessage, order.id);
     } catch (smsErr: any) {
       smsResult = {
         success: false,
         errorMessage: smsErr?.message || "Erreur inattendue lors de l'envoi SMS.",
+        errorKind: smsErr?.kind || "unknown",
       };
-      logger.error(CONTEXT, `SMS a levé une exception après commande #${order.id}`, smsErr);
+      logger.error("SMS", `SMS dispatch failed for order #${order.id}`, smsErr);
     }
 
     try {
-      await db.query(
-        `UPDATE orders SET sms_status = $1, sms_error = $2 WHERE id = $3`,
-        [smsResult.success ? "sent" : "failed", smsResult.errorMessage || null, order.id]
-      );
-    } catch (updateErr: any) {
-      logger.error(CONTEXT, `Commande #${order.id} créée mais mise à jour sms_status impossible`, updateErr);
+      await db.query(`UPDATE orders SET sms_status = $1, sms_error = $2 WHERE id = $3`, [
+        smsResult.success ? "sent" : "failed",
+        smsResult.success ? null : smsResult.errorMessage || null,
+        order.id,
+      ]);
+    } catch (updateOrderErr: any) {
+      logger.error(CONTEXT, `Could not update sms_status for order #${order.id}`, updateOrderErr);
     }
 
     if (!smsResult.success) {
-      logger.warn(CONTEXT, `Commande #${order.id} enregistrée mais SMS non envoyé: ${smsResult.errorMessage}`);
+      logger.warn("SMS", `Order #${order.id} stored but SMS failed: ${smsResult.errorMessage}`);
     }
 
     return res.status(201).json({
@@ -116,7 +122,7 @@ export async function createOrderWithDeps(
     });
   } catch (err: any) {
     await client.query("ROLLBACK");
-    logger.error(CONTEXT, `Échec createOrder pour la table ${table_number}`, err);
+    logger.error(CONTEXT, `createOrder failed for table ${table_number}`, err);
     return res.status(500).json({ error: "Erreur serveur lors de l'enregistrement de la commande.", detail: err.message });
   } finally {
     client.release();
@@ -125,19 +131,18 @@ export async function createOrderWithDeps(
 
 function buildSmsMessage(tableNumber: string, items: CartItem[], total: number): string {
   const lines = items.map((i) => `${i.qty}x ${i.name}`).join(", ");
-  return `NOUVELLE COMMANDE — Table ${tableNumber}: ${lines}. Total: ${total} FCFA.`;
+  return `NOUVELLE COMMANDE - Table ${tableNumber}: ${lines}. Total: ${total} FCFA.`;
 }
 
 /**
  * GET /api/orders
- * Liste des commandes (pour debug / vérif manuelle), la plus récente en premier.
  */
 export async function getOrders(req: Request, res: Response) {
   try {
     const result = await pool.query(`SELECT * FROM orders ORDER BY created_at DESC LIMIT 100`);
     return res.json(result.rows);
   } catch (err: any) {
-    logger.error(CONTEXT, "Échec getOrders", err);
+    logger.error(CONTEXT, "getOrders failed", err);
     return res.status(500).json({ error: "Erreur serveur lors de la récupération des commandes.", detail: err.message });
   }
 }

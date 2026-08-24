@@ -7,7 +7,10 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const app_1 = __importDefault(require("./app"));
 const db_1 = require("./config/db");
+const orange_1 = require("./config/orange");
+const ensure_sms_schema_1 = require("./db/ensure-sms-schema");
 const logger_1 = require("./utils/logger");
+const orange_sms_service_1 = require("./services/orange-sms.service");
 const PORT = process.env.PORT || 4000;
 // Capture les erreurs qui, sinon, feraient planter le process sans aucun log clair
 process.on("uncaughtException", (err) => {
@@ -19,10 +22,18 @@ process.on("unhandledRejection", (reason) => {
 });
 async function start() {
     try {
+        (0, orange_sms_service_1.validateOrangeSmsConfig)({
+            authorization: process.env.ORANGE_AUTHORIZATION || "",
+            clientId: process.env.ORANGE_CLIENT_ID || "",
+            clientSecret: process.env.ORANGE_CLIENT_SECRET || "",
+            senderAddress: process.env.ORANGE_SENDER_ADDRESS || "",
+        });
         await (0, db_1.testConnection)(); // plante ici avec un message clair si Neon est injoignable
+        await (0, ensure_sms_schema_1.ensureSmsSchema)();
         app_1.default.listen(PORT, () => {
             logger_1.logger.info("server.ts", `✅ Serveur démarré sur http://localhost:${PORT}`);
             logger_1.logger.info("server.ts", `📊 Dashboard admin: http://localhost:${PORT}/admin`);
+            logger_1.logger.info("server.ts", `📩 Orange SMS DR callback: ${(0, orange_1.getOrangeSmsDeliveryCallbackUrl)()}`);
         });
     }
     catch (err) {

@@ -1,0 +1,1 @@
+{"version":3,"file":"ensure-sms-schema.js","sourceRoot":"","sources":["../../src/db/ensure-sms-schema.ts"],"names":[],"mappings":";;;AAAA,qCAAoC;AACpC,4CAAyC;AAEzC,MAAM,OAAO,GAAG,KAAK,CAAC;AAEf,KAAK;IACV,MAAM,SAAI,CAAC,KAAK,CAAC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;GAkChB,CAAC,CAAC;IAEH,eAAM,CAAC,IAAI,CAAC,OAAO,EAAE,gCAAgC,CAAC,CAAC;AACzD,CAAC"}

@@ -13,7 +13,9 @@ const db_1 = require("../config/db");
 const logger_1 = require("../utils/logger");
 const CONTEXT = "tables.controller.ts";
 const QR_FOLDER = path_1.default.join(__dirname, "..", "..", "public", "qrcodes");
-const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "http://localhost:5500";
+const FRONTEND_BASE_URL = process.env.PUBLIC_BASE_URL ||
+    process.env.FRONTEND_BASE_URL ||
+    "http://localhost:4000";
 // Crée le dossier qrcodes/ s'il n'existe pas encore
 if (!fs_1.default.existsSync(QR_FOLDER)) {
     fs_1.default.mkdirSync(QR_FOLDER, { recursive: true });

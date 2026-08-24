@@ -188,3 +188,263 @@ body {
 .spin {
   animation: spin 1s linear infinite;
 }
+
+/* Login */
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(35, 25, 16, 0.72);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-overlay[hidden] {
+  display: none !important;
+}
+
+.login-card {
+  width: min(100%, 360px);
+  background: var(--color-white);
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.login-badge {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  border-radius: 16px;
+  background: var(--color-cream);
+  color: var(--color-red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card h2 {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--color-dark);
+  margin-bottom: 6px;
+}
+
+.login-card p {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin-bottom: 18px;
+}
+
+.login-status {
+  min-height: 1.2em;
+  margin-top: -6px;
+  margin-bottom: 12px !important;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.login-status.error {
+  color: var(--color-red);
+}
+
+.login-status.success {
+  color: #1f7a35;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.login-form label {
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.login-form input {
+  width: 100%;
+  padding: 14px 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--color-border);
+  font-size: 1.1rem;
+  text-align: center;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+}
+
+.login-form input:focus {
+  outline: none;
+  border-color: var(--color-red);
+}
+
+.login-card .btn-primary {
+  justify-content: center;
+  width: 100%;
+}
+
+/* SMS section */
+.sms-section {
+  margin-top: 34px;
+}
+
+.sms-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.section-subtitle {
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  margin-top: -8px;
+}
+
+.btn-ghost {
+  background: var(--color-white);
+  color: var(--color-dark);
+  border: 1px solid var(--color-border);
+}
+
+.sms-panel {
+  background: var(--color-white);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.sms-filters {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.sms-filters input,
+.sms-filters select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-cream);
+  font-size: 0.85rem;
+}
+
+.sms-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.sms-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1200px;
+}
+
+.sms-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-dark);
+  color: var(--color-white);
+  text-align: left;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 12px 10px;
+  white-space: nowrap;
+}
+
+.sms-table tbody td {
+  padding: 12px 10px;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.83rem;
+  vertical-align: top;
+}
+
+.sms-row {
+  cursor: pointer;
+}
+
+.sms-row:hover {
+  background: #fff9ef;
+}
+
+.sms-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.sms-pill-delivered { background: #dff4e4; color: #186a2f; }
+.sms-pill-pending { background: #fff2cc; color: #8a6600; }
+.sms-pill-failed { background: #fde1e1; color: #a11f1f; }
+.sms-pill-unknown { background: #ececec; color: #555; }
+
+.sms-empty {
+  padding: 22px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.sms-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.modal-large {
+  width: min(92vw, 760px);
+}
+
+.sms-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.detail-item {
+  background: var(--color-cream);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.detail-label {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.detail-value {
+  font-size: 0.92rem;
+  color: var(--color-dark);
+  font-weight: 600;
+  word-break: break-word;
+}
+
+@media (max-width: 900px) {
+  .sms-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sms-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}

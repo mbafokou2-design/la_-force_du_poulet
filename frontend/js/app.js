@@ -178,6 +178,30 @@ function findProduct(id) {
   return PRODUCTS.find((p) => p.id === id);
 }
 
+const KNOWN_PRODUCT_IMAGES = new Set([
+  "assets/images/produits/ailes-poulet.webp",
+  "assets/images/produits/ailes-roties.webp",
+  "assets/images/produits/burger-cuisse-epicee.webp",
+  "assets/images/produits/burger-poulet-epice.webp",
+  "assets/images/produits/burger-steak-boeuf.webp",
+  "assets/images/produits/chawarma-boeuf-mayo.webp",
+  "assets/images/produits/chawarma-poulet-classique.webp",
+  "assets/images/produits/chawarma-poulet-mayo.webp",
+  "assets/images/produits/clavicules.webp",
+  "assets/images/produits/cotes-poulet.webp",
+  "assets/images/produits/double-burger-poulet.webp",
+  "assets/images/produits/filets-poulet.webp",
+  "assets/images/produits/popcorn-poulet.webp",
+  "assets/images/logo.webp",
+  "assets/images/produits/product-placeholder.svg",
+]);
+
+const PRODUCT_IMAGE_PLACEHOLDER = "assets/images/produits/product-placeholder.svg";
+
+function resolveProductImage(imagePath) {
+  return KNOWN_PRODUCT_IMAGES.has(imagePath) ? imagePath : PRODUCT_IMAGE_PLACEHOLDER;
+}
+
 /* -----------------------------------------------------------------
    4. RENDU DES FILTRES & CATÉGORIES
    ----------------------------------------------------------------- */
@@ -239,7 +263,7 @@ function productCardHTML(product) {
       <div class="product-media">
         ${badgeHTML}
         <img
-          src="${product.image}"
+          src="${resolveProductImage(product.image)}"
           alt="${product.name}"
           loading="lazy"
           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
@@ -404,7 +428,7 @@ function cartItemHTML(item) {
   return `
     <div class="cart-item" data-id="${product.id}">
       <img
-        src="${product.image}"
+        src="${resolveProductImage(product.image)}"
         alt="${product.name}"
         class="cart-item-img"
         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
