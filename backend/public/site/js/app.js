@@ -110,6 +110,7 @@ let currentCategory = "tous";
 let currentSearch = "";
 let currentTable = getInitialTable();
 let cart = loadCart();
+let lastOrder = loadLastOrder();
 
 /* -----------------------------------------------------------------
    3. GESTION DU NUMÉRO DE TABLE & STOCKAGE
@@ -171,6 +172,26 @@ function loadCart() {
 function saveCart() {
   try {
     localStorage.setItem("lfp_cart", JSON.stringify(cart));
+  } catch (e) {}
+}
+
+function loadLastOrder() {
+  try {
+    const raw = localStorage.getItem("lfp_last_order");
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveLastOrder(order) {
+  lastOrder = order;
+  try {
+    if (order) {
+      localStorage.setItem("lfp_last_order", JSON.stringify(order));
+    } else {
+      localStorage.removeItem("lfp_last_order");
+    }
   } catch (e) {}
 }
 
@@ -367,6 +388,95 @@ function cartCount() {
   return cart.reduce((sum, item) => sum + item.qty, 0);
 }
 
+function buildOrderSnapshot(items, note = "") {
+  const resolvedItems = items.map((item) => {
+    const product = findProduct(item.id);
+    return {
+      id: item.id,
+      name: product ? product.name : item.id,
+      price: product ? product.price : item.price || 0,
+      qty: item.qty,
+    };
+  });
+
+  const total = resolvedItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+
+  return {
+    tableNumber: currentTable,
+    note,
+    total,
+    itemCount: resolvedItems.reduce((sum, item) => sum + item.qty, 0),
+    items: resolvedItems,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function orderItemSummaryHTML(item) {
+  return `
+    <div class="order-summary-row">
+      <div class="order-summary-item-name">${item.qty}x ${item.name}</div>
+      <div class="order-summary-item-price">${formatPrice(item.price * item.qty)}</div>
+    </div>
+  `;
+}
+
+function renderOrderSummary(order) {
+  const content = document.getElementById("orderSummaryContent");
+  const actionBtn = document.getElementById("orderSummaryAction");
+  if (!content) return;
+
+  const source = order || lastOrder;
+  const activeCartItems = cart.map((item) => {
+    const product = findProduct(item.id);
+    return {
+      id: item.id,
+      name: product ? product.name : item.id,
+      price: product ? product.price : 0,
+      qty: item.qty,
+    };
+  });
+
+  const snapshot = source || buildOrderSnapshot(activeCartItems, document.getElementById("orderNote")?.value?.trim() || "");
+  const hasItems = Array.isArray(snapshot.items) && snapshot.items.length > 0;
+  const subtitle = snapshot.createdAt
+    ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(snapshot.createdAt))
+    : "";
+
+  content.innerHTML = `
+    <div class="order-summary-meta">
+      <div><span class="order-summary-label">Table</span><strong>Table N° ${snapshot.tableNumber < 10 ? "0" + snapshot.tableNumber : snapshot.tableNumber}</strong></div>
+      <div><span class="order-summary-label">Articles</span><strong>${snapshot.itemCount || 0}</strong></div>
+      <div><span class="order-summary-label">Total</span><strong>${formatPrice(snapshot.total || 0)}</strong></div>
+    </div>
+    ${subtitle ? `<div class="order-summary-timestamp">${subtitle}</div>` : ""}
+    <div class="order-summary-list">
+      ${hasItems ? snapshot.items.map(orderItemSummaryHTML).join("") : `<div class="order-summary-empty">Aucun article dans cette commande.</div>`}
+    </div>
+    <div class="order-summary-note">
+      <span>Note</span>
+      <p>${snapshot.note ? snapshot.note : "Aucune note"}</p>
+    </div>
+    ${snapshot.orderId ? `<div class="order-summary-status">Commande #${snapshot.orderId}${snapshot.smsStatus ? ` - SMS ${snapshot.smsStatus}` : ""}</div>` : ""}
+  `;
+
+  if (actionBtn) {
+    actionBtn.textContent = cart.length > 0 ? "Voir le panier" : "Fermer";
+  }
+}
+
+function openOrderSummary(order) {
+  renderOrderSummary(order);
+  const overlay = document.getElementById("orderSummaryOverlay");
+  if (overlay) overlay.classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+function closeOrderSummary() {
+  const overlay = document.getElementById("orderSummaryOverlay");
+  if (overlay) overlay.classList.remove("open");
+  document.body.style.overflow = "";
+}
+
 function renderCart() {
   const itemsContainer = document.getElementById("cartItems");
   const emptyState = document.getElementById("cartEmptyState");
@@ -524,6 +634,10 @@ async function checkout() {
 
   const noteInput = document.getElementById("orderNote");
   const note = noteInput ? noteInput.value.trim() : "";
+  const orderSnapshot = buildOrderSnapshot(
+    cart.map((item) => ({ ...item })),
+    note
+  );
 
   // Enrichit chaque article avec le nom et le prix depuis PRODUCTS
   const items = cart.map((item) => {
@@ -564,12 +678,21 @@ async function checkout() {
     let msg = `✅ Commande transmise pour la ${tableStr} !`;
     if (note) msg += ` (Note: ${note})`;
 
+    const savedOrder = {
+      ...orderSnapshot,
+      orderId: data?.order_id ?? null,
+      smsStatus: data?.sms_status || "sent",
+      submittedAt: new Date().toISOString(),
+    };
+    saveLastOrder(savedOrder);
+    renderOrderSummary(savedOrder);
     showToast(msg);
     cart = [];
     saveCart();
     renderCart();
     closeCart();
     if (noteInput) noteInput.value = "";
+    openOrderSummary(savedOrder);
 
   } catch (err) {
     // ❌ Échec réseau ou erreur serveur — on garde le panier intact
@@ -634,6 +757,11 @@ function init() {
   const tableBadgeBtn = document.getElementById("tableBadgeBtn");
   if (tableBadgeBtn) tableBadgeBtn.addEventListener("click", openTableModal);
 
+  const orderSummaryToggle = document.getElementById("orderSummaryToggle");
+  if (orderSummaryToggle) {
+    orderSummaryToggle.addEventListener("click", () => openOrderSummary());
+  }
+
   const tableCloseBtn = document.getElementById("tableModalClose");
   if (tableCloseBtn) tableCloseBtn.addEventListener("click", closeTableModal);
 
@@ -654,6 +782,24 @@ function init() {
   document.getElementById("cartToggle").addEventListener("click", openCart);
   document.getElementById("cartCloseBtn").addEventListener("click", closeCart);
   document.getElementById("cartOverlay").addEventListener("click", closeCart);
+  document.getElementById("orderSummaryClose").addEventListener("click", closeOrderSummary);
+  document.getElementById("orderSummaryOverlay").addEventListener("click", (event) => {
+    if (event.target && event.target.id === "orderSummaryOverlay") {
+      closeOrderSummary();
+    }
+  });
+
+  const orderSummaryAction = document.getElementById("orderSummaryAction");
+  if (orderSummaryAction) {
+    orderSummaryAction.addEventListener("click", () => {
+      if (cart.length > 0) {
+        closeOrderSummary();
+        openCart();
+      } else {
+        closeOrderSummary();
+      }
+    });
+  }
 
   // Barre flottante du bas
   const bottomTrigger = document.getElementById("bottomCartTrigger");
@@ -661,6 +807,8 @@ function init() {
 
   const bottomCheckout = document.getElementById("bottomCheckoutBtn");
   if (bottomCheckout) bottomCheckout.addEventListener("click", openCart);
+
+  renderOrderSummary();
 
   // Validation commande
   const checkoutBtn = document.getElementById("checkoutBtn");

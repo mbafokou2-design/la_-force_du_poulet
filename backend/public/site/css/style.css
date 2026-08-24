@@ -142,6 +142,24 @@ input { font-family: inherit; }
   flex-shrink: 0;
 }
 
+.order-summary-toggle {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-dark);
+  background: var(--color-yellow);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.order-summary-toggle:hover {
+  transform: translateY(-1px);
+  background: #ffd84d;
+}
+
 /* Badge Numéro de Table */
 .table-badge {
   display: flex;
@@ -759,6 +777,112 @@ input { font-family: inherit; }
   font-size: 0.9rem;
 }
 
+.order-summary-modal {
+  max-width: 420px;
+}
+
+.order-summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.order-summary-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.order-summary-meta > div {
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--color-cream);
+  border: 1px solid var(--color-border);
+}
+
+.order-summary-label {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.order-summary-meta strong {
+  font-size: 0.95rem;
+  color: var(--color-dark);
+}
+
+.order-summary-timestamp {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.order-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fffaf1;
+  border: 1px solid var(--color-border);
+}
+
+.order-summary-item-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-dark);
+}
+
+.order-summary-item-price {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--color-red);
+  white-space: nowrap;
+}
+
+.order-summary-empty {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.order-summary-note {
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--color-cream);
+  border: 1px solid var(--color-border);
+}
+
+.order-summary-note span {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.order-summary-note p {
+  font-size: 0.88rem;
+  color: var(--color-dark);
+}
+
+.order-summary-status {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
 /* =================================================================
    PANIER LATÉRAL / BOTTOM SHEET
    ================================================================= */
@@ -1034,4 +1158,20 @@ input { font-family: inherit; }
 
 .toast.error {
   background: var(--color-red);
+}
+
+@media (max-width: 560px) {
+  .order-summary-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .app-header-actions {
+    gap: 6px;
+  }
+
+  .order-summary-toggle,
+  .cart-toggle {
+    width: 38px;
+    height: 38px;
+  }
 }
