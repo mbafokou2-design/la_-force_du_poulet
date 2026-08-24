@@ -15,6 +15,12 @@ function copyDir(source, target) {
 }
 
 try {
+  const targetIndex = path.join(targetDir, "index.html");
+  if (fs.existsSync(targetIndex)) {
+    console.log(`[copy-frontend] Frontend already present at ${targetDir}`);
+    process.exit(0);
+  }
+
   copyDir(sourceDir, targetDir);
   console.log(`[copy-frontend] Copied ${sourceDir} -> ${targetDir}`);
 } catch (err) {
