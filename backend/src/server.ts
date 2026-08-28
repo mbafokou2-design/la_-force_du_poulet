@@ -4,6 +4,7 @@ dotenv.config();
 import app from "./app";
 import { testConnection } from "./config/db";
 import { getOrangeSmsDeliveryCallbackUrl } from "./config/orange";
+import { getConfiguredPublicBaseUrl } from "./utils/public-url";
 import { ensureSmsSchema } from "./db/ensure-sms-schema";
 import { ensureFcmSchema } from "./db/ensure-fcm-schema";
 import { logger } from "./utils/logger";
@@ -40,6 +41,16 @@ async function start() {
     }
 
     app.listen(PORT, () => {
+      const publicUrl = getConfiguredPublicBaseUrl();
+      const fcmWebReady = Boolean(process.env.FIREBASE_WEB_CONFIG_JSON && process.env.FIREBASE_WEB_PUSH_CERTIFICATE_KEY);
+      const fcmAdminReady = Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY));
+      logger.info("STARTUP", `Public URL: ${publicUrl}`);
+      logger.info("STARTUP", `Admin: ${publicUrl}/admin/`);
+      logger.info("STARTUP", `Server alerts: ${publicUrl}/serveur/`);
+      logger.info("STARTUP", `Health: ${publicUrl}/api/health`);
+      logger.info("STARTUP", `SMS Orange: ${process.env.SMS_ENABLED === "true" ? "ENABLED" : "DISABLED - no Orange request will be sent"}`);
+      logger.info("STARTUP", `FCM web config: ${fcmWebReady ? "READY" : "MISSING"}`);
+      logger.info("STARTUP", `FCM Admin credentials: ${fcmAdminReady ? "READY" : "MISSING"}`);
       logger.info("server.ts", `✅ Serveur démarré sur http://localhost:${PORT}`);
       logger.info("server.ts", `📊 Dashboard admin: http://localhost:${PORT}/admin`);
       logger.info("server.ts", `📩 Orange SMS DR callback: ${getOrangeSmsDeliveryCallbackUrl()}`);

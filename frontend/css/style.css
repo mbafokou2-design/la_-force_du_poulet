@@ -1035,3 +1035,6 @@ input { font-family: inherit; }
 .toast.error {
   background: var(--color-red);
 }
+.btn-forget-table, .btn-clear-cart { color: var(--color-red); font-weight: 700; padding: 10px; text-decoration: underline; }
+.btn-forget-table { width: 100%; }
+.btn-clear-cart { width: 100%; margin-bottom: 10px; }

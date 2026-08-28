@@ -147,6 +147,27 @@ function saveTable(tableNum) {
   updateTableDisplay();
 }
 
+function forgetCurrentTable() {
+  if (!window.confirm("Oublier cette table et vider le panier de ce navigateur ?")) return;
+  cart = [];
+  saveCart();
+  try { localStorage.removeItem("lfp_table"); } catch (e) {}
+  currentTable = null;
+  closeTableModal();
+  const overlay = document.getElementById("missingTableOverlay");
+  if (overlay) overlay.style.display = "flex";
+}
+
+function clearCart() {
+  if (cart.length === 0 || !window.confirm("Vider tous les articles du panier ?")) return;
+  cart = [];
+  saveCart();
+  const noteInput = document.getElementById("orderNote");
+  if (noteInput) noteInput.value = "";
+  renderCart();
+  showToast("Panier vide.");
+}
+
 function updateTableDisplay() {
   const formatted = `Table N° ${currentTable < 10 ? '0' + currentTable : currentTable}`;
   const badgeText = document.getElementById("tableBadgeText");
@@ -634,6 +655,9 @@ function init() {
   const tableBadgeBtn = document.getElementById("tableBadgeBtn");
   if (tableBadgeBtn) tableBadgeBtn.addEventListener("click", openTableModal);
 
+  const forgetTableBtn = document.getElementById("forgetTableBtn");
+  if (forgetTableBtn) forgetTableBtn.addEventListener("click", forgetCurrentTable);
+
   const tableCloseBtn = document.getElementById("tableModalClose");
   if (tableCloseBtn) tableCloseBtn.addEventListener("click", closeTableModal);
 
@@ -663,6 +687,9 @@ function init() {
   if (bottomCheckout) bottomCheckout.addEventListener("click", openCart);
 
   // Validation commande
+  const clearCartBtn = document.getElementById("clearCartBtn");
+  if (clearCartBtn) clearCartBtn.addEventListener("click", clearCart);
+
   const checkoutBtn = document.getElementById("checkoutBtn");
   if (checkoutBtn) checkoutBtn.addEventListener("click", checkout);
 

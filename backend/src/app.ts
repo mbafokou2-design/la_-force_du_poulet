@@ -42,6 +42,8 @@ app.use((req, res, next) => {
 });
 
 app.use("/qrcodes", express.static(path.join(__dirname, "..", "public", "qrcodes")));
+app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "..", "public", "admin", "index.html")));
+app.get("/serveur", (req, res) => res.sendFile(path.join(__dirname, "..", "public", "serveur", "index.html")));
 app.use("/admin", express.static(path.join(__dirname, "..", "public", "admin")));
 app.use("/serveur", express.static(path.join(__dirname, "..", "public", "serveur")));
 app.get("/firebase-messaging-sw.js", (req, res) => {
