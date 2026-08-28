@@ -7,6 +7,7 @@ import { getOrangeSmsDeliveryCallbackUrl } from "./config/orange";
 import { getConfiguredPublicBaseUrl } from "./utils/public-url";
 import { ensureSmsSchema } from "./db/ensure-sms-schema";
 import { ensureFcmSchema } from "./db/ensure-fcm-schema";
+import { ensureOrderNotesSchema } from "./db/ensure-order-notes-schema";
 import { logger } from "./utils/logger";
 import { validateOrangeSmsConfig } from "./services/orange-sms.service";
 
@@ -35,6 +36,7 @@ async function start() {
       await testConnection();
       await ensureSmsSchema();
       await ensureFcmSchema();
+      await ensureOrderNotesSchema();
     } catch (dbErr) {
       logger.warn("server.ts", "⚠️ Base Neon indisponible au démarrage; le serveur continue sans initialisation DB.");
       logger.warn("server.ts", "Les routes dépendantes de la DB échoueront tant que Neon reste injoignable.", dbErr);

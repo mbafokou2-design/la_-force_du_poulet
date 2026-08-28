@@ -42,7 +42,7 @@ export async function getServerOrders(req: Request, res: Response) {
 export async function getServerOrderDetail(req: Request, res: Response) {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: "Commande invalide." });
-  const order = await pool.query(`SELECT id, table_number, total_amount, created_at FROM orders WHERE id = $1`, [id]);
+  const order = await pool.query(`SELECT id, table_number, total_amount, customer_note, created_at FROM orders WHERE id = $1`, [id]);
   if (!order.rows[0]) return res.status(404).json({ error: "Commande introuvable." });
   const items = await pool.query(`SELECT product_name, unit_price, quantity, subtotal FROM order_items WHERE order_id = $1 ORDER BY id`, [id]);
   return res.json({ ...order.rows[0], items: items.rows });

@@ -25,7 +25,10 @@ const request = async (path, options = {}) => {
   }
 };
 
-const loading = (show) => { $("loading").hidden = !show; };
+const loading = (show) => {
+  $("loading").hidden = !show;
+  document.querySelectorAll("#loginForm button, #enableButton, #unsubscribeButton").forEach((button) => { button.disabled = show; });
+};
 const showActivation = (message) => {
   $("successPanel").hidden = true;
   $("activationPanel").hidden = false;

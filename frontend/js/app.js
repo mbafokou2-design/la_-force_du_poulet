@@ -276,8 +276,6 @@ function productCardHTML(product) {
        </span>`
     : "";
 
-  const categoryObj = CATEGORIES.find((c) => c.id === product.category);
-  const categoryLabel = categoryObj ? `${categoryObj.icon} ${categoryObj.label}` : "";
 
   return `
     <article class="product-card" data-id="${product.id}">
@@ -294,7 +292,6 @@ function productCardHTML(product) {
         </div>
       </div>
       <div class="product-body">
-        <span class="product-category-tag">${categoryLabel}</span>
         <h3 class="product-name">${product.name}</h3>
         <p class="product-desc">${product.description}</p>
         <div class="product-footer">

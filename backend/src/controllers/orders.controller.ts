@@ -51,7 +51,8 @@ export async function createOrderWithDeps(
   const db = deps?.pool ?? pool;
   const sendOrderSms = deps?.sendOrderSms ?? sendOrderSmsDefault;
   const sendOrderPush = deps?.sendOrderPush ?? (deps ? async () => ({ enabled: false, attempted: 0, sent: 0, failed: 0 }) : dispatchOrderPush);
-  const { table_number, items } = req.body as { table_number: string; items: CartItem[] };
+  const { table_number, items, note: rawNote } = req.body as { table_number: string; items: CartItem[]; note?: unknown };
+  const customerNote = typeof rawNote === "string" ? rawNote.trim().slice(0, 500) : "";
 
   if (!table_number) {
     logger.warn(CONTEXT, "createOrder called without table_number");
@@ -77,8 +78,8 @@ export async function createOrderWithDeps(
     totalAmount = items.reduce((sum, item) => sum + item.price * item.qty, 0);
 
     const orderResult = await client.query(
-      `INSERT INTO orders (table_id, table_number, total_amount, sms_status) VALUES ($1, $2, $3, 'pending') RETURNING *`,
-      [tableId, table_number, totalAmount]
+      `INSERT INTO orders (table_id, table_number, total_amount, customer_note, sms_status) VALUES ($1, $2, $3, $4, 'pending') RETURNING *`,
+      [tableId, table_number, totalAmount, customerNote || null]
     );
     order = orderResult.rows[0];
 
@@ -112,7 +113,7 @@ export async function createOrderWithDeps(
     items: summarizeItems(items),
   });
 
-  const smsMessage = buildSmsMessage(table_number, items, totalAmount);
+  const smsMessage = buildSmsMessage(table_number, items, totalAmount, customerNote);
   logger.info(CONTEXT, `SMS prepare pour commande #${order.id}`, {
     orderId: order.id,
     tableNumber: table_number,
@@ -184,9 +185,10 @@ export async function createOrderWithDeps(
   });
 }
 
-function buildSmsMessage(tableNumber: string, items: CartItem[], total: number): string {
+function buildSmsMessage(tableNumber: string, items: CartItem[], total: number, customerNote = ""): string {
   const lines = items.map((i) => `${i.qty}x ${i.name}`).join(", ");
-  return `NOUVELLE COMMANDE - Table ${tableNumber}: ${lines}. Total: ${total} FCFA.`;
+  const noteSuffix = customerNote ? ` NOTE CLIENT: ${customerNote}.` : "";
+  return `NOUVELLE COMMANDE - Table ${tableNumber}: ${lines}. Total: ${total} FCFA.${noteSuffix}`;
 }
 
 function summarizeItems(items: CartItem[]): string {
