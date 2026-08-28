@@ -8,11 +8,21 @@ let lastToken = localStorage.getItem(TOKEN_KEY) || null;
 let workerRegistration;
 let vapidKey;
 
+const REQUEST_TIMEOUT_MS = 12000;
 const request = async (path, options = {}) => {
-  const response = await fetch(path, { credentials: "same-origin", headers: { "Content-Type": "application/json" }, ...options });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "Une erreur est survenue.");
-  return data;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(path, { credentials: "same-origin", headers: { "Content-Type": "application/json" }, ...options, signal: controller.signal });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Une erreur est survenue.");
+    return data;
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("Le serveur met trop de temps a repondre. Reessaie.");
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 };
 
 const loading = (show) => { $("loading").hidden = !show; };
@@ -28,7 +38,10 @@ const showReady = () => {
 };
 
 function timeout(promise, ms, message) {
-  return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms))]);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    Promise.resolve(promise).then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
+  });
 }
 
 async function prepareMessaging() {
@@ -70,7 +83,8 @@ async function restoreSubscription() {
 async function subscribe() {
   loading(true);
   try {
-    if (await Notification.requestPermission() !== "granted") throw new Error("Autorisation des notifications refusee.");
+    const permission = await timeout(Notification.requestPermission(), 20000, "La demande d'autorisation a expire. Reessaie puis accepte les notifications.");
+    if (permission !== "granted") throw new Error("Autorisation des notifications refusee.");
     const token = await obtainToken();
     await request("/api/fcm/tokens", { method: "POST", body: JSON.stringify({ token, device_label: navigator.userAgent.slice(0, 120) }) });
     showReady();
@@ -101,7 +115,7 @@ $("unsubscribeButton").addEventListener("click", async () => {
   try {
     const token = lastToken || localStorage.getItem(TOKEN_KEY);
     if (token) await request("/api/fcm/tokens", { method: "DELETE", body: JSON.stringify({ token }) });
-    if (messaging) await deleteToken(messaging);
+    if (messaging) await timeout(deleteToken(messaging), 12000, "La desactivation des notifications met trop de temps.");
     lastToken = null;
     localStorage.removeItem(TOKEN_KEY);
     showActivation("Notifications desactivees sur ce telephone.");
