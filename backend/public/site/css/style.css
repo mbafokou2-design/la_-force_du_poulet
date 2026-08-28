@@ -1327,3 +1327,10 @@ input { font-family: inherit; }
 .btn-forget-table, .btn-clear-cart { color: var(--color-red); font-weight: 700; padding: 10px; text-decoration: underline; }
 .btn-forget-table { width: 100%; }
 .btn-clear-cart { width: 100%; margin-bottom: 10px; }
+
+/* Command summary: only the body scrolls on small screens. */
+.order-summary-modal{display:flex;flex-direction:column;max-height:min(82dvh,680px)}
+.order-summary-modal .modal-header,.order-summary-modal .modal-footer{flex:0 0 auto;position:relative;z-index:1}
+.order-summary-modal .modal-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.order-summary-modal .modal-footer{box-shadow:0 -8px 18px rgba(32,17,13,.08)}
+@media(max-width:560px){.modal-overlay:has(.order-summary-modal){align-items:flex-end;padding:0}.order-summary-modal{max-width:none;max-height:86dvh;border-radius:22px 22px 0 0}.order-summary-modal .modal-body{padding-bottom:16px}.order-summary-modal .modal-footer{padding-bottom:max(16px,env(safe-area-inset-bottom))}}

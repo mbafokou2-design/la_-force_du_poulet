@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { pool } from "../config/db";
 import { deleteFcmTokens, getServerFcmTokenCount, upsertServerFcmToken } from "../repositories/fcm-tokens.repository";
 import { logger } from "../utils/logger";
 
@@ -31,4 +32,18 @@ export async function unregisterFcmToken(req: Request, res: Response) {
   const token = String(req.body?.token || "").trim();
   if (token) await deleteFcmTokens([token]);
   return res.json({ unregistered: true });
+}
+
+export async function getServerOrders(req: Request, res: Response) {
+  const result = await pool.query(`SELECT id, table_number, total_amount, created_at FROM orders ORDER BY created_at DESC LIMIT 50`);
+  return res.json({ items: result.rows });
+}
+
+export async function getServerOrderDetail(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: "Commande invalide." });
+  const order = await pool.query(`SELECT id, table_number, total_amount, created_at FROM orders WHERE id = $1`, [id]);
+  if (!order.rows[0]) return res.status(404).json({ error: "Commande introuvable." });
+  const items = await pool.query(`SELECT product_name, unit_price, quantity, subtotal FROM order_items WHERE order_id = $1 ORDER BY id`, [id]);
+  return res.json({ ...order.rows[0], items: items.rows });
 }

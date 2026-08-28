@@ -1,6 +1,6 @@
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  event.waitUntil(clients.openWindow("/serveur/"));
+  event.waitUntil(clients.openWindow(event.notification.data?.url || "/serveur/"));
 });
 
 importScripts("https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js");
@@ -15,7 +15,7 @@ firebase.messaging().onBackgroundMessage((payload) => {
     badge: "/assets/images/logo.webp",
     vibrate: [300, 150, 300],
     requireInteraction: true,
-    data: { url: "/serveur/" },
+    data: { url: payload.data?.url || "/serveur/" },
   };
   return self.registration.showNotification(title, options);
 });

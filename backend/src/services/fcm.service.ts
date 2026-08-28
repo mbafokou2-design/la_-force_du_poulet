@@ -33,6 +33,7 @@ export async function dispatchOrderPush(input: { orderId: number; tableNumber: s
   if (!fcm) return { enabled: false, attempted: 0, sent: 0, failed: 0 };
 
   const tokens = await getServerFcmTokens();
+  const orderUrl = `/serveur/commandes/?id=${input.orderId}`;
   let sent = 0;
   let failed = 0;
   const invalidTokens: string[] = [];
@@ -42,11 +43,11 @@ export async function dispatchOrderPush(input: { orderId: number; tableNumber: s
     const response: BatchResponse = await fcm.sendEachForMulticast({
       tokens: batch,
       notification: { title: `Nouvelle commande - Table ${input.tableNumber}`, body: input.message },
-      data: { orderId: String(input.orderId), tableNumber: input.tableNumber, url: "/serveur/" },
+      data: { orderId: String(input.orderId), tableNumber: input.tableNumber, url: orderUrl },
       webpush: {
         headers: { Urgency: "high", TTL: "300" },
         notification: { icon: "/assets/images/logo.webp", badge: "/assets/images/logo.webp", requireInteraction: true, vibrate: [300, 150, 300] },
-        fcmOptions: { link: "/serveur/" },
+        fcmOptions: { link: orderUrl },
       },
     });
     sent += response.successCount;
