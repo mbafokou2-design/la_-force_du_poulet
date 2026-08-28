@@ -623,3 +623,7 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+.sms-disabled{position:relative;filter:grayscale(1);opacity:.58}.sms-disabled>*:not(.sms-disabled-banner){pointer-events:none}.sms-disabled-banner{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px;padding:13px 16px;border-radius:12px;background:#e9e9e9;color:#565656;filter:none;opacity:1}.sms-disabled-banner span{font-size:.82rem}
+
+.fcm-status-section{margin-top:26px}.fcm-status-card{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:22px;border-radius:18px;background:linear-gradient(135deg,#2a1510,#54251c);color:#fff;box-shadow:var(--shadow-sm)}.fcm-status-card h2{margin:5px 0;font-size:1.25rem}.fcm-status-card p{margin:0;color:#f2dcd2;font-size:.86rem}.fcm-kicker{color:#ffd145;font-size:.7rem;font-weight:800;letter-spacing:.1em}.fcm-device-count{text-align:right}.fcm-device-count strong{display:block;font-size:2rem;color:#ffd145}.fcm-device-count span{font-size:.75rem;color:#f2dcd2}@media(max-width:560px){.fcm-status-card{align-items:flex-start;flex-direction:column}.fcm-device-count{text-align:left}}

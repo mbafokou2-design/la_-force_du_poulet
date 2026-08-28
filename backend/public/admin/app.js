@@ -371,6 +371,14 @@ function setLoginStatus(message, kind = "") {
   if (kind) el.classList.add(kind);
 }
 
+async function loadFcmStatus() {
+  const data = await apiCall("/api/fcm/admin-status");
+  const count = document.getElementById("fcmDeviceCount");
+  const status = document.getElementById("fcmStatusText");
+  if (count) count.textContent = data.registered_devices || 0;
+  if (status) status.textContent = data.configured ? "FCM est actif : les nouvelles commandes alertent les telephones inscrits." : "Configuration Firebase incomplete.";
+}
+
 async function loadStats() {
   const stats = await apiCall("/api/dashboard/stats");
   document.getElementById("statTotalOrders").textContent = stats.total_orders;
@@ -532,7 +540,7 @@ async function refreshSms() {
 }
 
 async function refreshAll() {
-  const results = await Promise.allSettled([loadStats(), loadTables(), refreshSms(), loadSmsRecipients()]);
+  const results = await Promise.allSettled([loadStats(), loadTables(), loadFcmStatus(), refreshSms(), loadSmsRecipients()]);
   const rejected = results.filter((result) => result.status === "rejected");
   if (rejected.length > 0) {
     const firstError = rejected[0].reason;

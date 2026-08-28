@@ -216,6 +216,13 @@ function saveLastOrder(order) {
   } catch (e) {}
 }
 
+function clearLastOrder() {
+  saveLastOrder(null);
+  updateOrderLiveStrip(null);
+  closeOrderSummary();
+  showToast("Rappel de commande supprime de ce navigateur.");
+}
+
 function updateOrderLiveStrip(order) {
   const strip = document.getElementById("orderLiveStrip");
   const text = document.getElementById("orderLiveText");
@@ -829,6 +836,8 @@ function init() {
   document.getElementById("cartToggle").addEventListener("click", openCart);
   document.getElementById("cartCloseBtn").addEventListener("click", closeCart);
   document.getElementById("cartOverlay").addEventListener("click", closeCart);
+  const clearLastOrderBtn = document.getElementById("clearLastOrderBtn");
+  if (clearLastOrderBtn) clearLastOrderBtn.addEventListener("click", clearLastOrder);
   document.getElementById("orderSummaryClose").addEventListener("click", closeOrderSummary);
   document.getElementById("orderSummaryOverlay").addEventListener("click", (event) => {
     if (event.target && event.target.id === "orderSummaryOverlay") {

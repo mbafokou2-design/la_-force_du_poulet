@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { upsertServerFcmToken } from "../repositories/fcm-tokens.repository";
+import { deleteFcmTokens, getServerFcmTokenCount, upsertServerFcmToken } from "../repositories/fcm-tokens.repository";
 import { logger } from "../utils/logger";
 
 export function getFcmPublicConfig(req: Request, res: Response) {
@@ -20,4 +20,15 @@ export async function registerFcmToken(req: Request, res: Response) {
   await upsertServerFcmToken(token, deviceLabel);
   logger.info("FCM", "Server device subscribed", { deviceLabel });
   return res.status(201).json({ registered: true });
+}
+
+export async function getFcmAdminStatus(req: Request, res: Response) {
+  const registeredDevices = await getServerFcmTokenCount();
+  return res.json({ configured: Boolean(process.env.FIREBASE_WEB_CONFIG_JSON && process.env.FIREBASE_WEB_PUSH_CERTIFICATE_KEY && process.env.FIREBASE_SERVICE_ACCOUNT_JSON), registered_devices: registeredDevices });
+}
+
+export async function unregisterFcmToken(req: Request, res: Response) {
+  const token = String(req.body?.token || "").trim();
+  if (token) await deleteFcmTokens([token]);
+  return res.json({ unregistered: true });
 }

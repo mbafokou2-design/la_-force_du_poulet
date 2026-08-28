@@ -21,3 +21,8 @@ export async function getServerFcmTokens(): Promise<string[]> {
 export async function deleteFcmTokens(tokens: string[]): Promise<void> {
   if (tokens.length) await pool.query(`DELETE FROM fcm_tokens WHERE token = ANY($1::text[])`, [tokens]);
 }
+
+export async function getServerFcmTokenCount(): Promise<number> {
+  const result = await pool.query(`SELECT COUNT(*)::int AS count FROM fcm_tokens WHERE role = 'server'`);
+  return Number(result.rows[0]?.count || 0);
+}
