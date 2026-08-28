@@ -9,6 +9,7 @@ const app_1 = __importDefault(require("./app"));
 const db_1 = require("./config/db");
 const orange_1 = require("./config/orange");
 const ensure_sms_schema_1 = require("./db/ensure-sms-schema");
+const ensure_fcm_schema_1 = require("./db/ensure-fcm-schema");
 const logger_1 = require("./utils/logger");
 const orange_sms_service_1 = require("./services/orange-sms.service");
 const PORT = process.env.PORT || 4000;
@@ -31,6 +32,7 @@ async function start() {
         try {
             await (0, db_1.testConnection)();
             await (0, ensure_sms_schema_1.ensureSmsSchema)();
+            await (0, ensure_fcm_schema_1.ensureFcmSchema)();
         }
         catch (dbErr) {
             logger_1.logger.warn("server.ts", "⚠️ Base Neon indisponible au démarrage; le serveur continue sans initialisation DB.");

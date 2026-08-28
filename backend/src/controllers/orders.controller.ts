@@ -3,6 +3,7 @@ import { pool } from "../config/db";
 import { logger } from "../utils/logger";
 import { SmsResult } from "../services/orange-sms.service";
 import { dispatchOrderSms } from "../services/sms-dispatch.service";
+import { dispatchOrderPush, type PushResult } from "../services/fcm.service";
 
 const CONTEXT = "ORDERS";
 
@@ -24,6 +25,7 @@ type QueryablePool = {
 export type CreateOrderDependencies = {
   pool: QueryablePool;
   sendOrderSms: (tableNumber: string, message: string, orderId?: number) => Promise<SmsResult>;
+  sendOrderPush: (input: { orderId: number; tableNumber: string; message: string }) => Promise<PushResult>;
 };
 
 async function sendOrderSmsDefault(tableNumber: string, message: string, orderId?: number): Promise<SmsResult> {
@@ -48,6 +50,7 @@ export async function createOrderWithDeps(
 ) {
   const db = deps?.pool ?? pool;
   const sendOrderSms = deps?.sendOrderSms ?? sendOrderSmsDefault;
+  const sendOrderPush = deps?.sendOrderPush ?? (deps ? async () => ({ enabled: false, attempted: 0, sent: 0, failed: 0 }) : dispatchOrderPush);
   const { table_number, items } = req.body as { table_number: string; items: CartItem[] };
 
   if (!table_number) {
@@ -116,42 +119,57 @@ export async function createOrderWithDeps(
     messageLength: smsMessage.length,
     messagePreview: smsMessage.length > 140 ? `${smsMessage.slice(0, 137)}...` : smsMessage,
   });
-  let smsResult: SmsResult = { success: false, errorMessage: "SMS non tente.", errorKind: "unknown" };
+  // Safety gate: Orange is never contacted unless explicitly enabled in the environment.
+  const smsEnabled = process.env.SMS_ENABLED === "true";
+  let smsResult: SmsResult = { success: false, errorMessage: "SMS disabled by SMS_ENABLED.", errorKind: "config" };
 
-  try {
-    logger.info(CONTEXT, `SMS dispatch demarre pour commande #${order.id}`);
-    smsResult = await sendOrderSms(table_number, smsMessage, order.id);
-    logger.info(CONTEXT, `SMS dispatch termine pour commande #${order.id}`, {
-      orderId: order.id,
-      success: smsResult.success,
-      errorKind: smsResult.errorKind || null,
-      errorMessage: smsResult.errorMessage || null,
-      attemptCount: smsResult.attemptCount ?? 0,
-      httpStatus: smsResult.httpStatus ?? null,
-      orangeResourceId: smsResult.orangeResourceId ?? null,
-      orangeRequestId: smsResult.orangeRequestId ?? null,
-      acceptedAt: smsResult.acceptedAt || null,
-      requestCompletedAt: smsResult.requestCompletedAt || null,
-      requestDurationMs: smsResult.requestDurationMs ?? null,
-    });
-  } catch (smsErr: any) {
-    smsResult = {
-      success: false,
-      errorMessage: smsErr?.message || "Erreur inattendue lors de l'envoi SMS.",
-      errorKind: smsErr?.kind || "unknown",
-    };
-    logger.error("SMS", `SMS dispatch failed for order #${order.id}`, smsErr);
+  const shouldTrySms = smsEnabled || Boolean(deps?.sendOrderSms);
+
+  if (shouldTrySms) {
+    try {
+      logger.info(CONTEXT, `SMS dispatch demarre pour commande #${order.id}`);
+      smsResult = await sendOrderSms(table_number, smsMessage, order.id);
+      logger.info(CONTEXT, `SMS dispatch termine pour commande #${order.id}`, {
+        orderId: order.id,
+        success: smsResult.success,
+        errorKind: smsResult.errorKind || null,
+        errorMessage: smsResult.errorMessage || null,
+        attemptCount: smsResult.attemptCount ?? 0,
+        httpStatus: smsResult.httpStatus ?? null,
+        orangeResourceId: smsResult.orangeResourceId ?? null,
+        orangeRequestId: smsResult.orangeRequestId ?? null,
+        acceptedAt: smsResult.acceptedAt || null,
+        requestCompletedAt: smsResult.requestCompletedAt || null,
+        requestDurationMs: smsResult.requestDurationMs ?? null,
+      });
+    } catch (smsErr: any) {
+      smsResult = {
+        success: false,
+        errorMessage: smsErr?.message || "Erreur inattendue lors de l'envoi SMS.",
+        errorKind: smsErr?.kind || "unknown",
+      };
+      logger.error("SMS", `SMS dispatch failed for order #${order.id}`, smsErr);
+    }
+  } else {
+    logger.info("SMS", `SMS disabled: Orange not called for order #${order.id}`);
   }
 
   try {
     await db.query(`UPDATE orders SET sms_status = $1, sms_error = $2 WHERE id = $3`, [
-      smsResult.success ? "sent" : "failed",
+      shouldTrySms ? (smsResult.success ? "sent" : "failed") : "disabled",
       smsResult.success ? null : smsResult.errorMessage || null,
       order.id,
     ]);
     logger.info(CONTEXT, `ordre #${order.id} mis a jour avec sms_status=${smsResult.success ? "sent" : "failed"}`);
   } catch (updateOrderErr: any) {
     logger.error(CONTEXT, `Could not update sms_status for order #${order.id}`, updateOrderErr);
+  }
+
+  let pushResult: PushResult = { enabled: false, attempted: 0, sent: 0, failed: 0 };
+  try {
+    pushResult = await sendOrderPush({ orderId: order.id, tableNumber: table_number, message: smsMessage });
+  } catch (pushErr: any) {
+    logger.error("FCM", `Push dispatch failed for order #${order.id}`, pushErr);
   }
 
   if (!smsResult.success) {
@@ -161,7 +179,8 @@ export async function createOrderWithDeps(
   return res.status(201).json({
     order_id: order.id,
     total_amount: totalAmount,
-    sms_status: smsResult.success ? "sent" : "failed",
+    sms_status: shouldTrySms ? (smsResult.success ? "sent" : "failed") : "disabled",
+    push: pushResult,
   });
 }
 

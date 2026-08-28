@@ -4,14 +4,9 @@ exports.dispatchOrderSms = dispatchOrderSms;
 const logger_1 = require("../utils/logger");
 const orange_sms_service_1 = require("./orange-sms.service");
 const sms_notifications_repository_1 = require("../repositories/sms-notifications.repository");
+const sms_recipients_repository_1 = require("../repositories/sms-recipients.repository");
 const sms_1 = require("../utils/sms");
 const CONTEXT = "SMS";
-function staffPhoneNumbers() {
-    return (process.env.STAFF_PHONE_NUMBERS || "")
-        .split(",")
-        .map((n) => n.trim())
-        .filter(Boolean);
-}
 function toStatus(result) {
     if (result.success)
         return "ACCEPTED";
@@ -27,12 +22,12 @@ async function dispatchOrderSms(input, service = new orange_sms_service_1.Orange
     senderAddress: process.env.ORANGE_SMS_SENDER || "",
 })) {
     logger_1.logger.info(CONTEXT, `notification requested (order #${input.orderId}, table ${input.tableNumber})`);
-    const recipients = staffPhoneNumbers();
+    const recipients = await (0, sms_recipients_repository_1.getSmsRecipients)();
     if (recipients.length === 0) {
         return {
             success: false,
             errorKind: "config",
-            errorMessage: "No staff phone numbers configured (STAFF_PHONE_NUMBERS).",
+            errorMessage: "No staff phone numbers configured.",
             recipients: [],
         };
     }

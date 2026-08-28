@@ -1,14 +1,19 @@
 import { Request, Response } from "express";
 /**
  * POST /api/tables
- * Crée une nouvelle table et génère son QR code (pointant vers le menu client).
+ * Create a new table and generate its QR target.
  */
 export declare function createTable(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
 /**
  * GET /api/tables
- * Liste toutes les tables avec leur QR code.
+ * List tables with their QR target and QR route.
  */
 export declare function getTables(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+/**
+ * GET /api/tables/:id/qr-code
+ * Generate the QR image on demand.
+ */
+export declare function getTableQrCode(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
 /**
  * DELETE /api/tables/:id
  */

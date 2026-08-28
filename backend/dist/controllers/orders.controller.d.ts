@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { SmsResult } from "../services/orange-sms.service";
+import { type PushResult } from "../services/fcm.service";
 type QueryablePool = {
     connect: () => Promise<{
         query: (sql: string, params?: unknown[]) => Promise<{
@@ -14,6 +15,11 @@ type QueryablePool = {
 export type CreateOrderDependencies = {
     pool: QueryablePool;
     sendOrderSms: (tableNumber: string, message: string, orderId?: number) => Promise<SmsResult>;
+    sendOrderPush: (input: {
+        orderId: number;
+        tableNumber: string;
+        message: string;
+    }) => Promise<PushResult>;
 };
 /**
  * POST /api/orders

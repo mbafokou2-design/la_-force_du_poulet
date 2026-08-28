@@ -14,6 +14,7 @@ exports.resetOrangeSmsServiceForTests = resetOrangeSmsServiceForTests;
 const dotenv_1 = __importDefault(require("dotenv"));
 const logger_1 = require("../utils/logger");
 const sms_1 = require("../utils/sms");
+const sms_recipients_repository_1 = require("../repositories/sms-recipients.repository");
 dotenv_1.default.config();
 const CONTEXT = "SMS";
 const ORANGE_TOKEN_URL = "https://api.orange.com/oauth/v3/token";
@@ -247,7 +248,7 @@ if (!bootConfig.authorization || !bootConfig.clientId || !bootConfig.clientSecre
     logger_1.logger.warn(CONTEXT, "Orange SMS config missing in .env; SMS sending will fail.");
 }
 if (staffPhoneNumbers().length === 0) {
-    logger_1.logger.warn(CONTEXT, "STAFF_PHONE_NUMBERS is empty; no staff SMS will be sent.");
+    logger_1.logger.info(CONTEXT, "STAFF_PHONE_NUMBERS is empty in .env; database-managed recipients will be used if configured.");
 }
 function staffPhoneNumbers() {
     return (process.env.STAFF_PHONE_NUMBERS || "")
@@ -396,9 +397,9 @@ class OrangeSmsService {
             logger_1.logger.error(CONTEXT, "OAuth failed");
             return { success: false, errorMessage, errorKind: "config" };
         }
-        const numbers = staffPhoneNumbers();
+        const numbers = await (0, sms_recipients_repository_1.getSmsRecipients)();
         if (numbers.length === 0) {
-            const errorMessage = "No staff phone numbers configured (STAFF_PHONE_NUMBERS).";
+            const errorMessage = "No staff phone numbers configured.";
             logger_1.logger.error(CONTEXT, errorMessage);
             return { success: false, errorMessage, errorKind: "config" };
         }

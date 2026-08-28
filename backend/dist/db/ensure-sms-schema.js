@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ensureSmsSchema = ensureSmsSchema;
 const db_1 = require("../config/db");
 const logger_1 = require("../utils/logger");
+const sms_recipients_repository_1 = require("../repositories/sms-recipients.repository");
 const CONTEXT = "SMS";
 async function ensureSmsSchema() {
     await db_1.pool.query(`
@@ -39,7 +40,18 @@ async function ensureSmsSchema() {
     CREATE INDEX IF NOT EXISTS idx_sms_notifications_provider ON sms_notifications(provider);
     CREATE INDEX IF NOT EXISTS idx_sms_notifications_recipient_phone ON sms_notifications(recipient_phone);
     CREATE INDEX IF NOT EXISTS idx_sms_notifications_orange_resource_id ON sms_notifications(orange_resource_id);
+
+    CREATE TABLE IF NOT EXISTS sms_delivery_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      staff_phone_numbers JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
   `);
-    logger_1.logger.info(CONTEXT, "sms_notifications schema ready");
+    const existing = await db_1.pool.query(`SELECT id FROM sms_delivery_settings WHERE id = 1`);
+    if (existing.rows.length === 0) {
+        await db_1.pool.query(`INSERT INTO sms_delivery_settings (id, staff_phone_numbers) VALUES ($1, $2::jsonb)`, [1, JSON.stringify((0, sms_recipients_repository_1.getDefaultSmsRecipients)())]);
+    }
+    logger_1.logger.info(CONTEXT, "SMS and FCM schemas ready");
 }
 //# sourceMappingURL=ensure-sms-schema.js.map

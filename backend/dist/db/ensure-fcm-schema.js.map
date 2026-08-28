@@ -1,0 +1,1 @@
+{"version":3,"file":"ensure-fcm-schema.js","sourceRoot":"","sources":["../../src/db/ensure-fcm-schema.ts"],"names":[],"mappings":";;;AAAA,qCAAoC;AACpC,4CAAyC;AAElC,KAAK;IACV,MAAM,SAAI,CAAC,KAAK,CAAC;;;;;;;;;;;GAWhB,CAAC,CAAC;IACH,eAAM,CAAC,IAAI,CAAC,KAAK,EAAE,yBAAyB,CAAC,CAAC;AAChD,CAAC"}

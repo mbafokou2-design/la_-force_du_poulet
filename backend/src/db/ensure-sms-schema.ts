@@ -56,5 +56,5 @@ export async function ensureSmsSchema(): Promise<void> {
     );
   }
 
-  logger.info(CONTEXT, "sms_notifications schema ready");
+  logger.info(CONTEXT, "SMS and FCM schemas ready");
 }

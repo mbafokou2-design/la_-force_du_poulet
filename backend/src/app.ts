@@ -11,6 +11,7 @@ import ordersRoutes from "./routes/orders.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
 import smsRoutes from "./routes/sms.routes";
 import webhooksRoutes from "./routes/webhooks.routes";
+import fcmRoutes from "./routes/fcm.routes";
 import { requireAdminAuth } from "./middleware/admin-auth";
 
 const app = express();
@@ -42,6 +43,13 @@ app.use((req, res, next) => {
 
 app.use("/qrcodes", express.static(path.join(__dirname, "..", "public", "qrcodes")));
 app.use("/admin", express.static(path.join(__dirname, "..", "public", "admin")));
+app.use("/serveur", express.static(path.join(__dirname, "..", "public", "serveur")));
+app.get("/firebase-messaging-sw.js", (req, res) => {
+  const config = process.env.FIREBASE_WEB_CONFIG_JSON;
+  if (!config) return res.status(503).type("application/javascript").send("throw new Error('FCM Web is not configured');");
+  const worker = fs.readFileSync(path.join(__dirname, "..", "public", "firebase-messaging-sw.js"), "utf8");
+  return res.type("application/javascript").send(worker.replace("__FIREBASE_CONFIG__", config));
+});
 
 const frontendRoot = getFrontendRoot();
 if (frontendRoot) {
@@ -53,6 +61,7 @@ if (frontendRoot) {
 
 app.use("/api/admin", adminRoutes);
 app.use("/api/webhooks", webhooksRoutes);
+app.use("/api/fcm", fcmRoutes);
 app.use("/api/orders", ordersRoutes);
 app.use("/api/tables", requireAdminAuth, tablesRoutes);
 app.use("/api/dashboard", requireAdminAuth, dashboardRoutes);

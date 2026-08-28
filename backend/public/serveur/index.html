@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Alertes serveurs | La Force du Poulet</title>
+  <link rel="stylesheet" href="/serveur/style.css">
+</head>
+<body>
+  <main>
+    <img src="/assets/images/logo.webp" alt="La Force du Poulet" class="logo">
+    <h1>Alertes de commandes</h1>
+    <p id="status">Connexion au service...</p>
+    <form id="loginForm" hidden>
+      <label for="code">Code serveur</label>
+      <input id="code" type="password" inputmode="numeric" autocomplete="current-password" required>
+      <button>Ouvrir les alertes</button>
+    </form>
+    <button id="enableButton" hidden>Activer les notifications</button>
+    <p class="hint">Laisse les notifications autorisees et le navigateur installe sur le telephone.</p>
+  </main>
+  <script type="module" src="/serveur/app.js"></script>
+</body>
+</html>

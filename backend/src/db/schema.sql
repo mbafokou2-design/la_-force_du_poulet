@@ -67,3 +67,15 @@ CREATE INDEX IF NOT EXISTS idx_sms_notifications_status ON sms_notifications(sta
 CREATE INDEX IF NOT EXISTS idx_sms_notifications_provider ON sms_notifications(provider);
 CREATE INDEX IF NOT EXISTS idx_sms_notifications_recipient_phone ON sms_notifications(recipient_phone);
 CREATE INDEX IF NOT EXISTS idx_sms_notifications_orange_resource_id ON sms_notifications(orange_resource_id);
+
+CREATE TABLE IF NOT EXISTS fcm_tokens (
+  id SERIAL PRIMARY KEY,
+  token TEXT NOT NULL UNIQUE,
+  role VARCHAR(30) NOT NULL DEFAULT 'server',
+  device_label VARCHAR(120),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  last_seen_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_fcm_tokens_role ON fcm_tokens(role);
