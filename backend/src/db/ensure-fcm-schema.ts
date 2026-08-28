@@ -12,7 +12,9 @@ export async function ensureFcmSchema(): Promise<void> {
       updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
       last_seen_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
+    ALTER TABLE fcm_tokens ADD COLUMN IF NOT EXISTS device_id VARCHAR(64);
     CREATE INDEX IF NOT EXISTS idx_fcm_tokens_role ON fcm_tokens(role);
+    CREATE INDEX IF NOT EXISTS idx_fcm_tokens_device_id ON fcm_tokens(device_id);
   `);
   logger.info("FCM", "fcm_tokens schema ready");
 }

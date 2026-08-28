@@ -1,8 +1,20 @@
 import type { Request, Response } from "express";
+import crypto from "crypto";
 import { pool } from "../config/db";
 import { deleteFcmTokens, getServerFcmTokenCount, upsertServerFcmToken } from "../repositories/fcm-tokens.repository";
 import { logger } from "../utils/logger";
+import { parseCookies } from "../middleware/admin-auth";
 
+const DEVICE_COOKIE = "lfp_fcm_device";
+const DEVICE_COOKIE_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000;
+
+function getDeviceId(req: Request, res: Response): string {
+  const current = String(parseCookies(req.headers.cookie)[DEVICE_COOKIE] || "");
+  if (/^[a-f0-9-]{36}$/i.test(current)) return current;
+  const deviceId = crypto.randomUUID();
+  res.cookie(DEVICE_COOKIE, deviceId, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: DEVICE_COOKIE_MAX_AGE_MS, path: "/" });
+  return deviceId;
+}
 export function getFcmPublicConfig(req: Request, res: Response) {
   const config = process.env.FIREBASE_WEB_CONFIG_JSON;
   const vapidKey = process.env.FIREBASE_WEB_PUSH_CERTIFICATE_KEY;
@@ -18,7 +30,8 @@ export async function registerFcmToken(req: Request, res: Response) {
   const token = String(req.body?.token || "").trim();
   const deviceLabel = String(req.body?.device_label || "").trim().slice(0, 120) || null;
   if (token.length < 20) return res.status(400).json({ error: "Token FCM invalide." });
-  await upsertServerFcmToken(token, deviceLabel);
+  const deviceId = getDeviceId(req, res);
+  await upsertServerFcmToken(token, deviceLabel, deviceId);
   logger.info("FCM", "Server device subscribed", { deviceLabel });
   return res.status(201).json({ registered: true });
 }

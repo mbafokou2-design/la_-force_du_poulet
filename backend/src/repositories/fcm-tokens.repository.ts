@@ -1,15 +1,18 @@
 import { pool } from "../config/db";
 
-export async function upsertServerFcmToken(token: string, deviceLabel: string | null): Promise<void> {
+export async function upsertServerFcmToken(token: string, deviceLabel: string | null, deviceId: string): Promise<void> {
+  // A browser which obtains a new FCM token replaces its old token immediately.
+  await pool.query(`DELETE FROM fcm_tokens WHERE role = 'server' AND device_id = $1 AND token <> $2`, [deviceId, token]);
   await pool.query(
-    `INSERT INTO fcm_tokens (token, role, device_label)
-     VALUES ($1, 'server', $2)
+    `INSERT INTO fcm_tokens (token, role, device_label, device_id)
+     VALUES ($1, 'server', $2, $3)
      ON CONFLICT (token) DO UPDATE SET
        role = 'server',
        device_label = COALESCE(EXCLUDED.device_label, fcm_tokens.device_label),
+       device_id = EXCLUDED.device_id,
        updated_at = NOW(),
        last_seen_at = NOW()`,
-    [token, deviceLabel]
+    [token, deviceLabel, deviceId]
   );
 }
 

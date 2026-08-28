@@ -74,9 +74,11 @@ CREATE TABLE IF NOT EXISTS fcm_tokens (
   token TEXT NOT NULL UNIQUE,
   role VARCHAR(30) NOT NULL DEFAULT 'server',
   device_label VARCHAR(120),
+  device_id VARCHAR(64),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   last_seen_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_fcm_tokens_role ON fcm_tokens(role);
+CREATE INDEX IF NOT EXISTS idx_fcm_tokens_device_id ON fcm_tokens(device_id);
