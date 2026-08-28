@@ -1,1 +1,125 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";import { getMessaging,getToken,onMessage,deleteToken } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging.js";const $=id=>document.getElementById(id);let messaging,lastToken;const request=async(path,options={})=>{const r=await fetch(path,{credentials:"same-origin",headers:{"Content-Type":"application/json"},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Une erreur est survenue.");return d};const loading=show=>$("loading").hidden=!show;const showReady=()=>{$("activationPanel").hidden=true;$("successPanel").hidden=false;$("status").textContent="Ce telephone est inscrit aux alertes."};async function subscribe(){loading(true);try{if(!("serviceWorker"in navigator)||!("Notification"in window))throw new Error("Ce navigateur ne prend pas en charge les notifications.");if(await Notification.requestPermission()!=="granted")throw new Error("Autorisation des notifications refusee.");const{firebaseConfig,vapidKey}=await request("/api/fcm/public-config");const registration=await navigator.serviceWorker.register("/firebase-messaging-sw.js");await navigator.serviceWorker.ready;messaging=getMessaging(initializeApp(firebaseConfig));lastToken=await getToken(messaging,{vapidKey,serviceWorkerRegistration:registration});if(!lastToken)throw new Error("Token FCM non genere.");await request("/api/fcm/tokens",{method:"POST",body:JSON.stringify({token:lastToken,device_label:navigator.userAgent.slice(0,120)})});onMessage(messaging,p=>{$("status").textContent=p.notification?.body||"Nouvelle commande recue.";});showReady()}catch(e){$("status").textContent=e.message; $("activationPanel").hidden=false}finally{loading(false)}}$("loginForm").addEventListener("submit",async e=>{e.preventDefault();loading(true);try{await request("/api/fcm/server/login",{method:"POST",body:JSON.stringify({code:$("code").value})});$("loginForm").hidden=true;$("activationPanel").hidden=false;$("status").textContent="Active maintenant les notifications."}catch(err){$("status").textContent=err.message}finally{loading(false)}});$("enableButton").addEventListener("click",subscribe);$("unsubscribeButton").addEventListener("click",async()=>{loading(true);try{if(lastToken)await request("/api/fcm/tokens",{method:"DELETE",body:JSON.stringify({token:lastToken})});if(messaging)await deleteToken(messaging);lastToken=null;$("successPanel").hidden=true;$("activationPanel").hidden=false;$("status").textContent="Notifications desactivees sur ce telephone."}finally{loading(false)}});request("/api/fcm/server/session").then(({authenticated})=>{if(authenticated){$("activationPanel").hidden=false;$("status").textContent="Active les notifications sur ce telephone."}else{$("loginForm").hidden=false;$("status").textContent="Entre le code serveur."}}).catch(()=>{$("loginForm").hidden=false});
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getMessaging, getToken, onMessage, deleteToken } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging.js";
+
+const $ = (id) => document.getElementById(id);
+const TOKEN_KEY = "lfp_server_fcm_token";
+let messaging;
+let lastToken = localStorage.getItem(TOKEN_KEY) || null;
+let workerRegistration;
+let vapidKey;
+
+const request = async (path, options = {}) => {
+  const response = await fetch(path, { credentials: "same-origin", headers: { "Content-Type": "application/json" }, ...options });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Une erreur est survenue.");
+  return data;
+};
+
+const loading = (show) => { $("loading").hidden = !show; };
+const showActivation = (message) => {
+  $("successPanel").hidden = true;
+  $("activationPanel").hidden = false;
+  $("status").textContent = message;
+};
+const showReady = () => {
+  $("activationPanel").hidden = true;
+  $("successPanel").hidden = false;
+  $("status").textContent = "Ce telephone est inscrit aux alertes.";
+};
+
+function timeout(promise, ms, message) {
+  return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms))]);
+}
+
+async function prepareMessaging() {
+  if (messaging && workerRegistration && vapidKey) return { messaging, workerRegistration, vapidKey };
+  if (!("serviceWorker" in navigator) || !("Notification" in window)) throw new Error("Ce navigateur ne prend pas en charge les notifications.");
+  const config = await timeout(request("/api/fcm/public-config"), 10000, "La configuration Firebase ne repond pas. Reessaie dans un instant.");
+  vapidKey = config.vapidKey;
+  workerRegistration = await timeout(navigator.serviceWorker.register("/firebase-messaging-sw.js"), 10000, "Le service de notifications ne demarre pas.");
+  await timeout(navigator.serviceWorker.ready, 10000, "Le service de notifications met trop de temps a demarrer.");
+  messaging = getMessaging(initializeApp(config.firebaseConfig));
+  onMessage(messaging, (payload) => { $("status").textContent = payload.notification?.body || "Nouvelle commande recue."; });
+  return { messaging, workerRegistration, vapidKey };
+}
+
+async function obtainToken() {
+  const setup = await prepareMessaging();
+  const token = await timeout(getToken(setup.messaging, { vapidKey: setup.vapidKey, serviceWorkerRegistration: setup.workerRegistration }), 15000, "Firebase ne repond pas sur ce telephone. Verifie Chrome et l'autorisation des notifications.");
+  if (!token) throw new Error("Token FCM non genere.");
+  lastToken = token;
+  localStorage.setItem(TOKEN_KEY, token);
+  return token;
+}
+
+async function restoreSubscription() {
+  if (Notification.permission !== "granted") {
+    showActivation("Active les notifications sur ce telephone.");
+    return;
+  }
+  $("status").textContent = "Verification des notifications de ce telephone...";
+  try {
+    const token = await obtainToken();
+    await request("/api/fcm/tokens", { method: "POST", body: JSON.stringify({ token, device_label: navigator.userAgent.slice(0, 120) }) });
+    showReady();
+  } catch (error) {
+    showActivation(error.message);
+  }
+}
+
+async function subscribe() {
+  loading(true);
+  try {
+    if (await Notification.requestPermission() !== "granted") throw new Error("Autorisation des notifications refusee.");
+    const token = await obtainToken();
+    await request("/api/fcm/tokens", { method: "POST", body: JSON.stringify({ token, device_label: navigator.userAgent.slice(0, 120) }) });
+    showReady();
+  } catch (error) {
+    showActivation(error.message);
+  } finally {
+    loading(false);
+  }
+}
+
+$("loginForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  loading(true);
+  try {
+    await request("/api/fcm/server/login", { method: "POST", body: JSON.stringify({ code: $("code").value }) });
+    $("loginForm").hidden = true;
+    await restoreSubscription();
+  } catch (error) {
+    $("status").textContent = error.message;
+  } finally {
+    loading(false);
+  }
+});
+
+$("enableButton").addEventListener("click", subscribe);
+$("unsubscribeButton").addEventListener("click", async () => {
+  loading(true);
+  try {
+    const token = lastToken || localStorage.getItem(TOKEN_KEY);
+    if (token) await request("/api/fcm/tokens", { method: "DELETE", body: JSON.stringify({ token }) });
+    if (messaging) await deleteToken(messaging);
+    lastToken = null;
+    localStorage.removeItem(TOKEN_KEY);
+    showActivation("Notifications desactivees sur ce telephone.");
+  } catch (error) {
+    $("status").textContent = error.message;
+  } finally {
+    loading(false);
+  }
+});
+
+request("/api/fcm/server/session").then(async ({ authenticated }) => {
+  if (authenticated) {
+    await restoreSubscription();
+  } else {
+    $("loginForm").hidden = false;
+    $("status").textContent = "Entre le code serveur.";
+  }
+}).catch(() => {
+  $("loginForm").hidden = false;
+  $("status").textContent = "Impossible de verifier la session.";
+});
